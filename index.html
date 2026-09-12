@@ -2,20 +2,70 @@
 <html lang="sv">
 <head>
   <meta charset="UTF-8">
-  <title>Knowledge Architecture Workbench (IEC 63339 | BFO vs ISO 15926)</title>
+  <title>IEC 63339 Knowledge Architecture Workbench</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js"></script>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 12px; background: #f8fafc; color: #0f172a; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body { margin: 0; padding: 12px; background: #f8fafc; color: #0f172a; display: flex; flex-direction: column; height: 100vh; }
     
-    .control-deck { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-shrink: 0; }
+    .control-deck { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .deck-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 14px; }
     .deck-row-top { background: #f1f5f9; border-bottom: 1px solid #e2e8f0; border-top-left-radius: 7px; border-top-right-radius: 7px; }
     
     .badge { background: #0284c7; color: #ffffff; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
     .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; display: flex; align-items: center; gap: 4px; }
     
+    /* Интерактивные бейджи стандарта IEC 63339 с подсказками */
+    .iec-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #7dd3fc;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: help;
+      position: relative;
+    }
+    .iec-badge:hover .iec-tooltip {
+      visibility: visible;
+      opacity: 1;
+    }
+    .iec-tooltip {
+      visibility: hidden;
+      opacity: 0;
+      position: absolute;
+      top: 130%;
+      left: 0;
+      z-index: 100;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.35;
+      min-width: 250px;
+      max-width: 320px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      transition: opacity 0.15s ease-in-out;
+      pointer-events: none;
+    }
+    .iec-tooltip::after {
+      content: "";
+      position: absolute;
+      bottom: 100%;
+      left: 14px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: transparent transparent #0f172a transparent;
+    }
+
     button { background: #0f172a; color: #ffffff; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
     button:hover { background: #334155; }
     button.secondary { background: #e2e8f0; color: #0f172a; }
@@ -68,38 +118,34 @@
     .swatch-line-past { width: 16px; height: 0; border-top: 2px dashed #94a3b8; margin-right: 8px; flex-shrink: 0; }
     .swatch-line-transition { width: 16px; height: 2px; background: #f59e0b; margin-right: 8px; flex-shrink: 0; }
 
-    /* Right sidebar container with safe flex geometry to prevent horizontal scrolling */
-    .sidebar { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 340px; max-width: 440px; height: 100%; min-height: 0; }
-    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; min-height: 0; }
-    
-    /* Safely structured card header to handle long IEC 63339 text labels */
-    .card h4 { margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; gap: 10px; }
-    .card h4 .card-title { flex-shrink: 0; }
-    .card h4 .iec-badge { text-align: right; color: #0284c7; font-weight: 600; font-size: 10px; line-height: 1.2; flex-shrink: 1; min-width: 0; word-wrap: break-word; }
-    .card h4 .iec-badge .sub-tag { color: #64748b; font-size: 9px; font-weight: 400; display: block; margin-top: 2px; text-transform: none; letter-spacing: normal; }
-    
-    .card-body { overflow-y: auto; flex: 1; min-height: 0; }
-    
-    ul.tree, ul.tree ul { list-style-type: none; padding-left: 14px; margin: 2px 0; }
-    ul.tree li { position: relative; padding: 2px 0; font-size: 12px; }
+    .sidebar { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 350px; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; overflow-y: auto; flex: 1; }
+    .card h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; display: flex; justify-content: space-between; align-items: center; }
+    ul.tree, ul.tree ul { list-style-type: none; padding-left: 16px; margin: 4px 0; }
+    ul.tree li { position: relative; padding: 2px 0; font-size: 13px; }
     ul.tree li::before { content: "├─ "; color: #94a3b8; }
     ul.tree li:last-child::before { content: "└─ "; color: #94a3b8; }
-    
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #f1f5f9; }
+    th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
     th { color: #64748b; font-weight: 600; }
     .active-row { background: #f0fdf4; }
     .closed-row { color: #94a3b8; text-decoration: line-through; }
-    
-    pre.code-block { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; color: #1e293b; line-height: 1.4; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; overflow-y: auto; white-space: pre-wrap; word-break: break-all; height: 100%; box-sizing: border-box; }
+    pre.code-block { margin: 0; font-family: monospace; font-size: 11px; color: #334155; line-height: 1.4; background: #f8fafc; padding: 8px; border-radius: 4px; border: 1px solid #e2e8f0; max-height: 180px; overflow-y: auto; }
   </style>
 </head>
 <body>
 
   <div class="control-deck">
-    <!-- Tier 1: Architectural paradigms -->
+    <!-- ЯРУС 1: Архитектурные уровни IEC 63339 (SMIM & SMS) -->
     <div class="deck-row deck-row-top">
-      <div class="section-label">🏛️ <span id="lbl-onto-title">Ontologi:</span></div>
+      
+      <!-- SMIM: Top-Level Ontology -->
+      <div class="section-label">
+        <span class="iec-badge">IEC 63339 / SMIM
+          <span class="iec-tooltip" id="tt-smim"></span>
+        </span>
+        <span id="lbl-onto-title">Ontologi:</span>
+      </div>
       <div class="btn-group">
         <button id="onto-bfo" class="active" onclick="setOntology('BFO')">BFO (3D Continuant)</button>
         <button id="onto-iso" onclick="setOntology('ISO15926')">ISO 15926 (4D Perdurant)</button>
@@ -107,7 +153,13 @@
 
       <div class="divider"></div>
 
-      <div class="section-label">💾 <span id="lbl-graph-title">Datamodell:</span></div>
+      <!-- SMS: Graph Database Storage -->
+      <div class="section-label">
+        <span class="iec-badge">IEC 63339 / SMS
+          <span class="iec-tooltip" id="tt-sms"></span>
+        </span>
+        <span id="lbl-graph-title">Datamodell:</span>
+      </div>
       <div class="btn-group">
         <button id="mode-lpg" class="active" onclick="setGraphMode('LPG')">LPG</button>
         <button id="mode-rdf" onclick="setGraphMode('RDF')">RDF (W3C)</button>
@@ -115,6 +167,7 @@
 
       <div class="divider"></div>
 
+      <!-- Визуализатор -->
       <div class="section-label">🎨 <span id="lbl-engine-title">Motor:</span></div>
       <div class="btn-group">
         <button id="eng-vis" class="active" onclick="setEngine('vis')">🌐 Vis.js</button>
@@ -128,10 +181,18 @@
       </div>
     </div>
 
-    <!-- Tier 2: Engineering actions & persistence -->
+    <!-- ЯРУС 2: SMRM Concept Repository & Ввод действий -->
     <div class="deck-row">
       <span class="badge" id="time-display">T = 0</span>
       <button id="step-btn" onclick="advanceTime()"></button>
+
+      <div class="divider"></div>
+
+      <!-- Зафиксированная Domain Ontology (SMRM) -->
+      <span class="iec-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">
+        IEC 63339 / SMRM: <span id="lbl-smrm-status" style="font-weight: normal; margin-left: 3px;">Domain Ontology (Fixed: System/IDO)</span>
+        <span class="iec-tooltip" id="tt-smrm"></span>
+      </span>
 
       <div class="divider"></div>
 
@@ -150,51 +211,38 @@
       <label style="font-size: 11px; color: #475569; display: flex; align-items: center; gap: 4px;">
         <input type="checkbox" id="history-toggle" checked onchange="render()"> <span id="lbl-history"></span>
       </label>
-
-      <div style="margin-left: auto; display: flex; gap: 6px;">
-        <button id="btn-export" class="secondary" onclick="exportStateToFile()">💾 <span id="lbl-export">Export</span></button>
-        <button id="btn-import" class="secondary" onclick="document.getElementById('file-importer').click()">📂 <span id="lbl-import">Import</span></button>
-        <input type="file" id="file-importer" accept=".json" style="display: none;" onchange="importStateFromFile(event)">
-      </div>
     </div>
   </div>
 
-  <main class="main-container">
+  <div class="main-container">
     <div id="canvas-container">
       <div id="vis-container"></div>
       <div id="mermaid-container" style="display: none;"></div>
       <div id="graph-legend" class="graph-legend"></div>
     </div>
     
-    <aside class="sidebar">
-      <!-- 1. URMSM Viewpoint (End-user layer) -->
-      <section class="card" style="flex: 0 0 23%;">
+    <div class="sidebar">
+      <!-- URMSM: Viewpoint & Concerns -->
+      <div class="card" style="flex: 0 0 35%;">
         <h4>
-          <span id="title-bom" class="card-title"></span> 
-          <div class="iec-badge">IEC 63339: URMSM<span class="sub-tag">Viewpoint Layer</span></div>
+          <span id="title-bom"></span>
+          <span class="iec-badge">IEC 63339 / URMSM
+            <span class="iec-tooltip" id="tt-urmsm"></span>
+          </span>
         </h4>
-        <div class="card-body" id="tree-container"></div>
-      </section>
+        <div id="tree-container"></div>
+      </div>
 
-      <!-- 2. SMIM Implementation Model (Rules & Query Generation) -->
-      <section class="card" style="flex: 0 0 37%;">
+      <!-- SMS: Low-Level Storage Details -->
+      <div class="card" style="flex: 1;">
         <h4>
-          <span id="title-query" class="card-title"></span> 
-          <div id="query-lang-tag" class="iec-badge"></div>
+          <span id="title-storage"></span>
+          <span id="storage-paradigm-tag" style="color:#0284c7; font-weight: 600;"></span>
         </h4>
-        <div class="card-body" id="query-content"></div>
-      </section>
-
-      <!-- 3. SMS Storage Instance (Physical Data Layer) -->
-      <section class="card" style="flex: 0 0 40%;">
-        <h4>
-          <span id="title-storage" class="card-title"></span> 
-          <div id="storage-paradigm-tag" class="iec-badge"></div>
-        </h4>
-        <div class="card-body" id="storage-content"></div>
-      </section>
-    </aside>
-  </main>
+        <div id="storage-content"></div>
+      </div>
+    </div>
+  </div>
 
   <script>
     mermaid.initialize({
@@ -215,16 +263,20 @@
         addBtn: "+ Lägg till",
         removeBtn: "Uteslut relation",
         history: "Historik",
-        exportBtn: "Exportera JSON",
-        importBtn: "Importera JSON",
-        titleBom: "Struktur (BOM)",
-        titleQuery: "Genererad databasfråga",
-        titleStorage: "Grafdatabas",
+        titleBom: "Struktur (BOM-träd)",
+        titleStorage: "Under huven",
         activeStatus: "Aktiv",
         closedStatus: "Avslutad",
         sourceCol: "Källa",
         targetCol: "Mål",
         statusCol: "Status",
+        smrmStatus: "Domänontologi (Låst: System/IDO)",
+        tooltips: {
+          urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Definierar intressentens perspektiv (ISO 42010 Viewpoint). Användaren ser bara BOM-strukturen vid tidpunkten T, oavsett underliggande IT-lager.",
+          smrm: "<b>SMRM (Concept Repository)</b><br/>Domänontologi och gemensam begreppsbank (System, Component, Physical/Functional Object). Här låst till standardiserad produktnedbrytning.",
+          smim: "<b>SMIM (Information Elements & Rules)</b><br/>Top-Level Ontology (TLO). Formella regler för hur begreppen existerar i tiden: 3D-objekt med tidsintervall (BFO) eller 4D-rumtidsindivider (ISO 15926).",
+          sms: "<b>SMS (Data in Tool)</b><br/>Den faktiska IT-implementationen och datalagringen (Property Graph / Neo4j kontra W3C RDF Triples)."
+        },
         legend: {
           title: "Teckenförklaring",
           nodes: "Noder",
@@ -253,16 +305,20 @@
         addBtn: "+ Add",
         removeBtn: "Sever relation",
         history: "History",
-        exportBtn: "Export JSON",
-        importBtn: "Import JSON",
-        titleBom: "Assembly Structure",
-        titleQuery: "Database Query Engine",
-        titleStorage: "Graph Data Store",
+        titleBom: "BOM Tree Structure",
+        titleStorage: "Under the Bonnet",
         activeStatus: "Active",
         closedStatus: "Closed",
         sourceCol: "Source",
         targetCol: "Target",
         statusCol: "Status",
+        smrmStatus: "Domain Ontology (Fixed: System/IDO)",
+        tooltips: {
+          urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Captures the stakeholder concern and viewpoint (ISO 42010). The engineer always sees a unified BOM snapshot at time T, decoupled from graph mechanics.",
+          smrm: "<b>SMRM (Concept Repository)</b><br/>Domain Ontology: the shared engineering lexicon (System, System Element, Physical/Functional Object). Fixed here to ISO-aligned decomposition.",
+          smim: "<b>SMIM (Information Elements & Rules)</b><br/>Top-Level Ontology (TLO). Axiomatic rules governing time and identity: 3D Continuants (BFO) vs 4D Spatio-Temporal Extents (ISO 15926).",
+          sms: "<b>SMS (Data in Tool)</b><br/>Low-level physical IT implementation: Labeled Property Graphs (Neo4j style) vs W3C RDF Triples and serialized statements."
+        },
         legend: {
           title: "Graph Legend",
           nodes: "Node Types",
@@ -291,16 +347,20 @@
         addBtn: "+ Добавить",
         removeBtn: "Исключить связь",
         history: "История",
-        exportBtn: "Экспорт JSON",
-        importBtn: "Импорт JSON",
         titleBom: "Состав изделия (BOM)",
-        titleQuery: "Генератор запросов БД",
-        titleStorage: "Хранилище графа",
+        titleStorage: "Под капотом",
         activeStatus: "Активна",
         closedStatus: "Закрыта",
         sourceCol: "Источник",
         targetCol: "Цель",
         statusCol: "Статус",
+        smrmStatus: "Domain Ontology (Зафиксирована: System/IDO)",
+        tooltips: {
+          urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Уровень точки зрения пользователя (ISO 42010). Инженер всегда видит чистый срез BOM на момент времени T, абстрагированный от структуры базы данных.",
+          smrm: "<b>SMRM (Concept Repository)</b><br/>Онтология предметной области (Domain Ontology). Общий словарь понятий проекта (System, Component, Physical Object). Зафиксирована на базовой декомпозиции.",
+          smim: "<b>SMIM (Information Elements & Rules)</b><br/>Верхнеуровневая онтология (TLO). Математические аксиомы бытия и времени: 3D-тела с интервалами связей (BFO) или 4D-объемы пространства-времени (ISO 15926).",
+          sms: "<b>SMS (Data in Tool)</b><br/>Физическое IT-хранилище в конкретной СУБД: узлы и свойства на ребрах (LPG) против атомарных триплетов URI (W3C RDF)."
+        },
         legend: {
           title: "Легенда графа",
           nodes: "Типы узлов",
@@ -322,9 +382,9 @@
     };
 
     let currentLang = 'sv';
-    let currentOntology = 'BFO';
-    let currentMode = 'LPG';
-    let currentEngine = 'vis';
+    let currentOntology = 'BFO';       // 'BFO' | 'ISO15926'
+    let currentMode = 'LPG';            // 'LPG' | 'RDF'
+    let currentEngine = 'vis';          // 'vis' | 'mermaid'
     let currentTime = 0;
     const ROOT_ID = 'System_A';
 
@@ -398,11 +458,15 @@
       document.getElementById('add-btn').innerText = t.addBtn;
       document.getElementById('remove-btn').innerText = t.removeBtn;
       document.getElementById('lbl-history').innerText = t.history;
-      document.getElementById('lbl-export').innerText = t.exportBtn;
-      document.getElementById('lbl-import').innerText = t.importBtn;
       document.getElementById('title-bom').innerText = t.titleBom;
-      document.getElementById('title-query').innerText = t.titleQuery;
       document.getElementById('title-storage').innerText = t.titleStorage;
+      document.getElementById('lbl-smrm-status').innerText = t.smrmStatus;
+
+      // Локализация тултипов IEC 63339
+      document.getElementById('tt-urmsm').innerHTML = t.tooltips.urmsm;
+      document.getElementById('tt-smrm').innerHTML = t.tooltips.smrm;
+      document.getElementById('tt-smim').innerHTML = t.tooltips.smim;
+      document.getElementById('tt-sms').innerHTML = t.tooltips.sms;
 
       render();
     }
@@ -485,64 +549,6 @@
       render();
     }
 
-    function exportStateToFile() {
-      const statePayload = {
-        version: "1.1",
-        framework: "IEC 63339 URMSM Sandbox",
-        exportedAt: new Date().toISOString(),
-        currentTime,
-        currentOntology,
-        currentMode,
-        edgeSeq,
-        baseNodes,
-        edgesStore
-      };
-
-      const jsonBlob = new Blob([JSON.stringify(statePayload, null, 2)], { type: "application/json" });
-      const downloadUrl = URL.createObjectURL(jsonBlob);
-      const downloadLink = document.createElement("a");
-      downloadLink.href = downloadUrl;
-      downloadLink.download = `workbench_state_T${currentTime}_${currentOntology}_${currentMode}.json`;
-      downloadLink.click();
-      URL.revokeObjectURL(downloadUrl);
-    }
-
-    function importStateFromFile(event) {
-      const selectedFile = event.target.files[0];
-      if (!selectedFile) return;
-
-      const fileReader = new FileReader();
-      fileReader.onload = function(e) {
-        try {
-          const parsed = JSON.parse(e.target.result);
-          if (!parsed.baseNodes || !parsed.edgesStore) {
-            throw new Error("Invalid schema format: missing baseNodes or edgesStore.");
-          }
-
-          currentTime = parsed.currentTime || 0;
-          currentOntology = parsed.currentOntology || 'BFO';
-          currentMode = parsed.currentMode || 'LPG';
-          edgeSeq = parsed.edgeSeq || (parsed.edgesStore.length + 1);
-
-          baseNodes.length = 0;
-          parsed.baseNodes.forEach(node => baseNodes.push(node));
-
-          edgesStore.length = 0;
-          parsed.edgesStore.forEach(edge => edgesStore.push(edge));
-
-          document.getElementById('time-display').innerText = `T = ${currentTime}`;
-          setOntology(currentOntology);
-          setGraphMode(currentMode);
-          render();
-        } catch (err) {
-          alert("Error importing workbench configuration: " + err.message);
-        }
-      };
-
-      fileReader.readAsText(selectedFile);
-      event.target.value = '';
-    }
-
     function buildTreeHTML(nodeId, activeEdges) {
       const children = activeEdges.filter(e => e.from === nodeId).map(e => e.to);
       if (children.length === 0) return '';
@@ -614,6 +620,7 @@
           });
         }
       } else {
+        // ISO 15926
         baseNodes.forEach(n => {
           visNodes.add({
             id: `4d_${n.id}`,
@@ -654,7 +661,6 @@
               color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
               width: e.isActive ? 2 : 1
             });
-
             if (!parentStates[e.from]) parentStates[e.from] = [];
             parentStates[e.from].push({ id: parentStateId, edge: e });
           } else {
@@ -734,6 +740,7 @@
           });
         }
       } else {
+        // ISO 15926
         baseNodes.forEach(n => {
           const wId = `whole_${safeId(n.id)}`;
           def += `  ${wId}["<b>${n.label}_4D</b><br/>iso:ActualIndividual"]:::iso4d\n`;
@@ -836,6 +843,7 @@
           `;
         }
       } else {
+        // ISO 15926
         const extraLpgEdge = (currentMode === 'LPG') 
           ? `<div class="legend-item"><span class="swatch-line-transition"></span>${leg.isoTransitionRel}</div>`
           : '';
@@ -855,73 +863,6 @@
           </div>
         `;
       }
-    }
-
-    // IEC 63339 SMIM implementation query logic mapping
-    function generateDatabaseQuery() {
-      const queryTag = document.getElementById('query-lang-tag');
-      const queryContainer = document.getElementById('query-content');
-      
-      let queryLang = '';
-
-      if (currentOntology === 'BFO') {
-        if (currentMode === 'LPG') {
-          queryLang = 'Cypher (LPG)';
-          const cypher = `// Retrieve entire active BOM hierarchy of ${ROOT_ID} at T = ${currentTime}\n` +
-`MATCH path = (root:System {id: '${ROOT_ID}'})-[:HAS_PART*]->(leaf:Element)\n` +
-`WHERE ALL(r IN relationships(path)\n` +
-`  WHERE r.valid_from <= ${currentTime} AND (r.valid_to > ${currentTime} OR r.valid_to IS NULL))\n` +
-`RETURN [n IN nodes(path) | n.id] AS bom_path,\n` +
-`       leaf.id AS component_id;\n` +
-`// IEC 63339 SMIM: Direct path traversal using edge property filters`;
-          queryContainer.innerHTML = `<pre class="code-block">${cypher}</pre>`;
-        } else {
-          queryLang = 'SPARQL 1.1 (RDF)';
-          const sparql = `# Retrieve active BOM for :${ROOT_ID} at T = ${currentTime} via reified statements\n` +
-`PREFIX : <http://example.org/engineering#>\n` +
-`PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n\n` +
-`SELECT ?parent ?child\n` +
-`WHERE {\n` +
-`  ?rel a :TemporalPartMembership ;\n` +
-`       :hasParent ?parent ;\n` +
-`       :hasChild ?child ;\n` +
-`       :validFrom ?validFrom .\n` +
-`  OPTIONAL { ?rel :validTo ?validTo . }\n` +
-`  FILTER (?validFrom <= ${currentTime} && (!BOUND(?validTo) || ?validTo > ${currentTime}))\n` +
-`}\n` +
-`# IEC 63339 SMIM: Join-intensive pattern matching over reification statements`;
-          queryContainer.innerHTML = `<pre class="code-block">${sparql}</pre>`;
-        }
-      } else {
-        if (currentMode === 'LPG') {
-          queryLang = 'Cypher (ISO 15926)';
-          const cypher = `// Traverse 4D states intersecting T = ${currentTime}\n` +
-`MATCH (root4D:ActualIndividual {id: '4d_${ROOT_ID}'})<-[:temporalPartOf]-(rootState:State)\n` +
-`WHERE rootState.valid_from <= ${currentTime} AND (rootState.valid_to > ${currentTime} OR rootState.valid_to IS NULL)\n` +
-`MATCH path = (rootState)-[:COMPOSED_OF*]->(leafState:State)-[:temporalPartOf]->(leaf4D:ActualIndividual)\n` +
-`RETURN root4D.id AS root, leaf4D.id AS component, leafState.id AS active_slice;\n` +
-`// IEC 63339 SMIM: Fast trajectory over timeless state compositions`;
-          queryContainer.innerHTML = `<pre class="code-block">${cypher}</pre>`;
-        } else {
-          queryLang = 'SPARQL 1.1 (ISO 15926)';
-          const sparql = `# Pure binary 4D navigation for :${ROOT_ID} at T = ${currentTime}\n` +
-`PREFIX iso: <http://standards.iso.org/iso/15926/part2#>\n` +
-`PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n\n` +
-`SELECT ?component4D ?activeStateSlice\n` +
-`WHERE {\n` +
-`  :${ROOT_ID}_4D ^iso:temporalPartOf ?rootState .\n` +
-`  ?rootState iso:validFrom ?from .\n` +
-`  OPTIONAL { ?rootState iso:validTo ?to . }\n` +
-`  FILTER (?from <= ${currentTime} && (!BOUND(?to) || ?to > ${currentTime}))\n\n` +
-`  ?rootState (iso:hasPart)+ ?activeStateSlice .\n` +
-`  ?activeStateSlice iso:temporalPartOf ?component4D .\n` +
-`}\n` +
-`# IEC 63339 SMIM: No reification needed; uses property paths (iso:hasPart)+`;
-          queryContainer.innerHTML = `<pre class="code-block">${sparql}</pre>`;
-        }
-      }
-      
-      queryTag.innerHTML = `IEC 63339: SMIM<span class="sub-tag">${queryLang}</span>`;
     }
 
     function render() {
@@ -945,9 +886,11 @@
 
       updateLegend();
 
+      // URMSM BOM View
       const treeContainer = document.getElementById('tree-container');
       treeContainer.innerHTML = `<strong>${ROOT_ID}</strong>` + buildTreeHTML(ROOT_ID, activeEdges);
 
+      // Контролы
       const parentSelect = document.getElementById('parent-select');
       const removeSelect = document.getElementById('remove-select');
       parentSelect.innerHTML = '';
@@ -968,11 +911,10 @@
         removeSelect.appendChild(opt);
       });
 
-      generateDatabaseQuery();
-
+      // Storage Panel (SMS)
       const storageTag = document.getElementById('storage-paradigm-tag');
       const storageContent = document.getElementById('storage-content');
-      storageTag.innerHTML = `IEC 63339: SMS<span class="sub-tag">${currentOntology} / ${currentMode}</span>`;
+      storageTag.innerText = `SMS / ${currentOntology} / ${currentMode}`;
 
       if (currentOntology === 'BFO') {
         if (currentMode === 'LPG') {
@@ -988,7 +930,7 @@
           html += '</tbody></table>';
           storageContent.innerHTML = html;
         } else {
-          let ttl = `# BFO 3D: RDF Turtle with Reification\n`;
+          let ttl = `# BFO 3D in SMS: RDF Turtle with Reification\n`;
           edgesStore.forEach(e => {
             const isActive = (e.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
             if (!isActive && !showHistory) return;
@@ -1000,6 +942,7 @@
           storageContent.innerHTML = `<pre class="code-block">${ttl}</pre>`;
         }
       } else {
+        // ISO 15926
         if (currentMode === 'LPG') {
           let html = `<table><thead><tr><th>Parent Slice</th><th>Child Slice</th><th>LPG Rel Properties</th><th>4D Extent</th></tr></thead><tbody>`;
           visibleEdges.forEach(e => {
@@ -1013,7 +956,7 @@
           html += '</tbody></table>';
           storageContent.innerHTML = html;
         } else {
-          let ttl = `# ISO 15926-2: Pure Binary RDF Triples (Tenseless Composition)\n`;
+          let ttl = `# ISO 15926-2 in SMS: Pure Binary RDF Triples (Tenseless Composition)\n`;
           visibleEdges.forEach(e => {
             const pState = `:${e.from}_state_${e.id}`;
             const cState = `:${e.to}_state_${e.id}`;
