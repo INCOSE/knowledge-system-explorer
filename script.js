@@ -266,25 +266,48 @@ function renderVisData(visibleEdges) {
   visNodes.clear(); visEdges.clear();
 
   if (currentOntology === 'BFO') {
-    if (currentMode === 'LPG') {
-      baseNodes.forEach(n => { visNodes.add({ id: n.id, label: `${n.label}\n(:bfo:MaterialEntity)`, color: n.type === 'system' ? '#0284c7' : '#64748b', font: { color: '#ffffff', bold: n.type === 'system' } }); });
-      visibleEdges.forEach(e => { visEdges.add({ id: e.id, from: e.from, to: e.to, label: e.isActive ? `has_part: [T${e.valid_from}..now]` : `has_part: [T${e.valid_from}..T${e.valid_to}]`, color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' }, dashes: !e.isActive, width: e.isActive ? 2 : 1 }); });
-    } else {
-      baseNodes.forEach(n => { visNodes.add({ id: n.id, label: `:${n.label}\na bfo:MaterialEntity`, color: n.type === 'system' ? '#0284c7' : '#475569', font: { color: '#ffffff' } }); });
-      visibleEdges.forEach(e => {
-        const stmtId = `stmt_${e.id}`, litFromId = `lit_from_${e.id}`, litToId = `lit_to_${e.id}`;
-        visNodes.add({ id: stmtId, label: `_:${e.id}\na :TemporalPartMembership`, shape: 'diamond', size: 26, color: e.isActive ? '#f59e0b' : '#e2e8f0', font: { size: 9, color: e.isActive ? '#000000' : '#64748b' } });
-        visEdges.add({ from: stmtId, to: e.from, label: ':hasParent', color: '#94a3b8' });
-        visEdges.add({ from: stmtId, to: e.to, label: ':hasChild', color: '#94a3b8' });
-        visNodes.add({ id: litFromId, label: `"T${e.valid_from}"^^xsd:int`, shape: 'box', color: '#f8fafc', font: { size: 8 } });
-        visEdges.add({ from: stmtId, to: litFromId, label: ':validFrom', color: '#cbd5e1' });
-        if (e.valid_to !== null) {
-          visNodes.add({ id: litToId, label: `"T${e.valid_to}"^^xsd:int`, shape: 'box', color: '#f8fafc', font: { size: 8 } });
-          visEdges.add({ from: stmtId, to: litToId, label: ':validTo', color: '#cbd5e1', dashes: true });
-        }
-      });
-    }
-  } else {
+        if (currentMode === 'LPG') {
+          baseNodes.forEach(n => {
+            visNodes.add({
+              id: n.id,
+              label: `${n.label}\n(:bfo:MaterialEntity)`,
+              color: n.type === 'system' ? '#0284c7' : '#64748b',
+              font: { color: '#ffffff', bold: n.type === 'system' }
+            });
+          });
+
+          // Группируем ребра по направленной паре узлов (from -> to)
+          const pairMap = {};
+          visibleEdges.forEach(e => {
+            const pairKey = `${e.from}->${e.to}`;
+            if (!pairMap[pairKey]) pairMap[pairKey] = [];
+            pairMap[pairKey].push(e);
+          });
+
+          Object.values(pairMap).forEach(edgesGroup => {
+            // Сортируем по времени создания, чтобы дуги ложились хронологическими слоями
+            edgesGroup.sort((a, b) => a.valid_from - b.valid_from);
+
+            const count = edgesGroup.length;
+            edgesGroup.forEach((e, idx) => {
+              // Если ребро одно — стандартный пологий изгиб; если несколько — веер с шагом 0.14
+              const smoothConfig = count === 1 
+                ? { type: 'continuous', roundness: 0.2 }
+                : { type: 'curvedCW', roundness: Math.min(0.14 + (idx * 0.14), 0.85) };
+
+              visEdges.add({
+                id: e.id,
+                from: e.from,
+                to: e.to,
+                label: e.isActive ? `has_part: [T${e.valid_from}..now]` : `has_part: [T${e.valid_from}..T${e.valid_to}]`,
+                color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
+                dashes: !e.isActive,
+                width: e.isActive ? 2 : 1,
+                smooth: smoothConfig
+              });
+            });
+          });
+        } else {
     baseNodes.forEach(n => { visNodes.add({ id: `4d_${n.id}`, label: `${n.label}_4D\n(iso:ActualIndividual)`, color: '#4f46e5', font: { color: '#ffffff', bold: true } }); });
     const parentStates = {};
 
