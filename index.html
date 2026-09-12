@@ -96,9 +96,9 @@
 
   <!-- Dual-tier control console -->
   <div class="control-deck">
-    <!-- Tier 1: Architectural paradigms -->
+    <!-- Tier 1: Architectural paradigms (IEC 63339 URMSM / SMRM / SMIM) -->
     <div class="deck-row deck-row-top">
-      <div class="section-label">🏛️ <span id="lbl-onto-title">Ontologi:</span></div>
+      <div class="section-label">🏛️ <span id="lbl-onto-title">Ontology:</span></div>
       <div class="btn-group">
         <button id="onto-bfo" class="active" onclick="setOntology('BFO')">BFO (3D Continuant)</button>
         <button id="onto-iso" onclick="setOntology('ISO15926')">ISO 15926 (4D Perdurant)</button>
@@ -106,7 +106,7 @@
 
       <div class="divider"></div>
 
-      <div class="section-label">💾 <span id="lbl-graph-title">Datamodell:</span></div>
+      <div class="section-label">💾 <span id="lbl-graph-title">Data Model:</span></div>
       <div class="btn-group">
         <button id="mode-lpg" class="active" onclick="setGraphMode('LPG')">LPG</button>
         <button id="mode-rdf" onclick="setGraphMode('RDF')">RDF (W3C)</button>
@@ -114,7 +114,7 @@
 
       <div class="divider"></div>
 
-      <div class="section-label">🎨 <span id="lbl-engine-title">Motor:</span></div>
+      <div class="section-label">🎨 <span id="lbl-engine-title">Renderer:</span></div>
       <div class="btn-group">
         <button id="eng-vis" class="active" onclick="setEngine('vis')">🌐 Vis.js</button>
         <button id="eng-mermaid" onclick="setEngine('mermaid')">📊 Mermaid</button>
@@ -152,44 +152,45 @@
 
       <!-- Client-side export and import controls -->
       <div style="margin-left: auto; display: flex; gap: 6px;">
-        <button id="btn-export" class="secondary" onclick="exportStateToFile()">💾 <span id="lbl-export">Exportera</span></button>
-        <button id="btn-import" class="secondary" onclick="document.getElementById('file-importer').click()">📂 <span id="lbl-import">Importera</span></button>
+        <button id="btn-export" class="secondary" onclick="exportStateToFile()">💾 <span id="lbl-export">Export</span></button>
+        <button id="btn-import" class="secondary" onclick="document.getElementById('file-importer').click()">📂 <span id="lbl-import">Import</span></button>
         <input type="file" id="file-importer" accept=".json" style="display: none;" onchange="importStateFromFile(event)">
       </div>
     </div>
   </div>
 
-  <div class="main-container">
-    <!-- Visualisation canvas -->
+  <main class="main-container">
+    <!-- Visualisation canvas (SMS - Smart Manufacturing System / Data in Tool layer) -->
     <div id="canvas-container">
       <div id="vis-container"></div>
       <div id="mermaid-container" style="display: none;"></div>
       <div id="graph-legend" class="graph-legend"></div>
     </div>
     
-    <!-- Sidebar: 3 inspection cards -->
-    <div class="sidebar">
-      <!-- 1. End-user viewpoint (IEC 63339 URMSM BOM View) -->
-      <div class="card" style="flex: 0 0 22%;">
+    <!-- Sidebar: 3 inspection cards bridging URMSM theory to tool instance data -->
+    <aside class="sidebar">
+      <!-- 1. End-user viewpoint (IEC 63339 URMSM / Viewpoint layer) -->
+      <section class="card" style="flex: 0 0 22%;">
         <h4><span id="title-bom"></span> <span style="color:#0284c7; font-weight: normal;">URMSM / Viewpoint</span></h4>
         <div class="card-body" id="tree-container"></div>
-      </div>
+      </section>
 
-      <!-- 2. Query complexity inspector (Cypher / SPARQL) -->
-      <div class="card" style="flex: 0 0 38%;">
+      <!-- 2. Query complexity inspector (Cypher / SPARQL retrieval execution) -->
+      <section class="card" style="flex: 0 0 38%;">
         <h4><span id="title-query"></span> <span id="query-lang-tag" style="color:#0284c7; font-weight: 600;"></span></h4>
         <div class="card-body" id="query-content"></div>
-      </div>
+      </section>
 
-      <!-- 3. Physical data model representation -->
-      <div class="card" style="flex: 0 0 40%;">
+      <!-- 3. Physical data model representation (IEC 63339 SMIM / SMS instance layer) -->
+      <section class="card" style="flex: 0 0 40%;">
         <h4><span id="title-storage"></span> <span id="storage-paradigm-tag" style="color:#0284c7; font-weight: normal;"></span></h4>
         <div class="card-body" id="storage-content"></div>
-      </div>
-    </div>
-  </div>
+      </section>
+    </aside>
+  </main>
 
   <script>
+    // Initialise Mermaid rendering configuration
     mermaid.initialize({
       startOnLoad: false,
       theme: 'neutral',
@@ -197,6 +198,7 @@
       flowchart: { curve: 'basis', htmlLabels: true }
     });
 
+    // Multilingual dictionary (Swedish, British English, Russian) adhering to IEC 63339 terminology
     const i18n = {
       sv: {
         ontoTitle: "Ontologi:",
@@ -212,7 +214,7 @@
         importBtn: "Importera JSON",
         titleBom: "Struktur (BOM-träd)",
         titleQuery: "Genererad databasfråga",
-        titleStorage: "Under huven",
+        titleStorage: "Under huven (SMS)",
         activeStatus: "Aktiv",
         closedStatus: "Avslutad",
         sourceCol: "Källa",
@@ -250,7 +252,7 @@
         importBtn: "Import JSON",
         titleBom: "BOM Tree Structure",
         titleQuery: "Generated Database Query",
-        titleStorage: "Under the Bonnet",
+        titleStorage: "Under the Bonnet (SMS)",
         activeStatus: "Active",
         closedStatus: "Closed",
         sourceCol: "Source",
@@ -288,7 +290,7 @@
         importBtn: "Импорт JSON",
         titleBom: "Состав изделия (BOM)",
         titleQuery: "Генерируемый запрос к БД",
-        titleStorage: "Под капотом",
+        titleStorage: "Под капотом (SMS)",
         activeStatus: "Активна",
         closedStatus: "Закрыта",
         sourceCol: "Источник",
@@ -314,28 +316,34 @@
       }
     };
 
+    // System state variables reflecting IEC 63339 model-type mappings
     let currentLang = 'sv';
-    let currentOntology = 'BFO';
-    let currentMode = 'LPG';
-    let currentEngine = 'vis';
+    let currentOntology = 'BFO';       // 'BFO' (3D Continuant) | 'ISO15926' (4D Perdurant)
+    let currentMode = 'LPG';            // 'LPG' (Labeled Property Graph) | 'RDF' (W3C Triples)
+    let currentEngine = 'vis';          // 'vis' (Vis.js physics) | 'mermaid' (Static diagram)
     let currentTime = 0;
     const ROOT_ID = 'System_A';
 
+    // Canonical master inventory of system nodes (SMRM concepts / SMIM Information Elements)
     const baseNodes = [
       { id: ROOT_ID, label: 'System_A', type: 'system' }
     ];
 
+    // Master temporal edge storage representing part-whole relations across lifecycle steps
     let edgesStore = [];
     let edgeSeq = 1;
     let mermaidCounter = 0;
 
+    // Concurrency serialisation queue for asynchronous Mermaid rendering
     let isRenderingMermaid = false;
     let pendingMermaidDef = null;
 
+    // Vis.js dataset instances for dynamic graph rendering (SMS layer)
     const visNodes = new vis.DataSet();
     const visEdges = new vis.DataSet();
     const visContainer = document.getElementById('vis-container');
 
+    // Configure Vis.js physics parameters for optimal node separation and readability
     function getVisOptions() {
       const isComplex = (currentMode === 'RDF' || currentOntology === 'ISO15926');
       return {
@@ -371,10 +379,12 @@
 
     const network = new vis.Network(visContainer, { nodes: visNodes, edges: visEdges }, getVisOptions());
 
+    // Sanitise string identifiers for safe syntax compliance in Mermaid flowchart definitions
     function safeId(id) {
       return id.replace(/[^a-zA-Z0-9_]/g, '_');
     }
 
+    // Set active interface localisation and update dynamic UI elements
     function setLanguage(lang) {
       currentLang = lang;
       ['sv', 'en', 'ru'].forEach(l => {
@@ -400,6 +410,7 @@
       render();
     }
 
+    // Switch upper ontology framework (BFO 3D vs ISO 15926 4D)
     function setOntology(onto) {
       currentOntology = onto;
       document.getElementById('onto-bfo').className = (onto === 'BFO') ? 'active' : '';
@@ -408,6 +419,7 @@
       render();
     }
 
+    // Switch data model storage paradigm (LPG vs RDF W3C)
     function setGraphMode(mode) {
       currentMode = mode;
       document.getElementById('mode-lpg').className = (mode === 'LPG') ? 'active' : '';
@@ -416,6 +428,7 @@
       render();
     }
 
+    // Switch canvas rendering engine (Vis.js dynamic vs Mermaid static layout)
     function setEngine(engine) {
       currentEngine = engine;
       document.getElementById('eng-vis').className = (engine === 'vis') ? 'active' : '';
@@ -433,6 +446,7 @@
       render();
     }
 
+    // Append a component relationship to the master temporal store (SMIM authoring action)
     function addPart(parentId, name, silent = false) {
       if (!name || !parentId) return;
       const partId = name.trim();
@@ -456,6 +470,7 @@
       if (!silent) render();
     }
 
+    // Handle UI form submission for adding a part
     function handleAddPart() {
       const parent = document.getElementById('parent-select').value;
       const input = document.getElementById('part-input');
@@ -463,6 +478,7 @@
       input.value = '';
     }
 
+    // Close active temporal relationship at current time step coordinate
     function handleRemoveEdge() {
       const edgeId = document.getElementById('remove-select').value;
       const edge = edgesStore.find(e => e.id === edgeId);
@@ -472,15 +488,18 @@
       render();
     }
 
+    // Advance discrete simulation time coordinate T
     function advanceTime() {
       currentTime++;
       document.getElementById('time-display').innerText = `T = ${currentTime}`;
       render();
     }
 
+    // Serialise application state into a JSON payload for client-side download
     function exportStateToFile() {
       const statePayload = {
         version: "1.0",
+        framework: "IEC 63339 URMSM Sandbox",
         exportedAt: new Date().toISOString(),
         currentTime,
         currentOntology,
@@ -499,6 +518,7 @@
       URL.revokeObjectURL(downloadUrl);
     }
 
+    // Deserialise and restore state from an uploaded JSON configuration file
     function importStateFromFile(event) {
       const selectedFile = event.target.files[0];
       if (!selectedFile) return;
@@ -535,6 +555,7 @@
       event.target.value = '';
     }
 
+    // Recursive HTML tree builder for the IEC 63339 Viewpoint layer
     function buildTreeHTML(nodeId, activeEdges) {
       const children = activeEdges.filter(e => e.from === nodeId).map(e => e.to);
       if (children.length === 0) return '';
@@ -546,12 +567,14 @@
       return html;
     }
 
+    // Compile model instances into Vis.js interactive nodes and edges (SMS layer)
     function renderVisData(visibleEdges) {
       visNodes.clear();
       visEdges.clear();
 
       if (currentOntology === 'BFO') {
         if (currentMode === 'LPG') {
+          // BFO 3D Continuant mapped to Labeled Property Graph (LPG)
           baseNodes.forEach(n => {
             visNodes.add({
               id: n.id,
@@ -572,6 +595,7 @@
             });
           });
         } else {
+          // BFO 3D Continuant mapped to W3C RDF with Reification statements
           baseNodes.forEach(n => {
             visNodes.add({
               id: n.id,
@@ -606,6 +630,7 @@
           });
         }
       } else {
+        // ISO 15926-2 (4D Perdurantism with Spatio-Temporal Extents and States)
         baseNodes.forEach(n => {
           visNodes.add({
             id: `4d_${n.id}`,
@@ -677,6 +702,7 @@
       }
     }
 
+    // Compile model instances into Mermaid flowchart definitions for static rendering
     function generateMermaidDef(visibleEdges) {
       let def = 'flowchart TD\n';
       def += '  classDef bfoSys fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
@@ -768,6 +794,7 @@
       return def;
     }
 
+    // Execute Mermaid SVG rendering asynchronously through a serialised queue
     async function executeMermaidRender(chartDefinition) {
       if (isRenderingMermaid) {
         pendingMermaidDef = chartDefinition;
@@ -792,6 +819,7 @@
       }
     }
 
+    // Synchronise static legend glyphs with selected ontology and model paradigm
     function updateLegend() {
       const leg = i18n[currentLang].legend;
       const container = document.getElementById('graph-legend');
@@ -849,6 +877,7 @@
       }
     }
 
+    // Dynamically generate and format the database retrieval query (IEC 63339 SMIM mapping)
     function generateDatabaseQuery() {
       const queryTag = document.getElementById('query-lang-tag');
       const queryContainer = document.getElementById('query-content');
@@ -862,10 +891,10 @@
 `  WHERE r.valid_from <= ${currentTime} AND (r.valid_to > ${currentTime} OR r.valid_to IS NULL))\n` +
 `RETURN [n IN nodes(path) | n.id] AS bom_path,\n` +
 `       leaf.id AS component_id;\n` +
-`// Complexity: O(k^d) traversal with in-memory relationship filtering`;
+`// IEC 63339 SMIM: Direct path traversal using edge property filters`;
           queryContainer.innerHTML = `<pre class="code-block">${cypher}</pre>`;
         } else {
-          queryTag.innerText = 'SPARQL 1.1 (W3C RDF)';
+          queryTag.innerText = 'SPARQL 1.1 (W3C RDF / OWL)';
           const sparql = `# Retrieve active BOM for :${ROOT_ID} at T = ${currentTime} via reified statements\n` +
 `PREFIX : <http://example.org/engineering#>\n` +
 `PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n\n` +
@@ -878,7 +907,7 @@
 `  OPTIONAL { ?rel :validTo ?validTo . }\n` +
 `  FILTER (?validFrom <= ${currentTime} && (!BOUND(?validTo) || ?validTo > ${currentTime}))\n` +
 `}\n` +
-`# Complexity: Join-intensive index scan over intermediate statement nodes`;
+`# IEC 63339 SMIM: Join-intensive pattern matching over reification statements`;
           queryContainer.innerHTML = `<pre class="code-block">${sparql}</pre>`;
         }
       } else {
@@ -889,7 +918,7 @@
 `WHERE rootState.valid_from <= ${currentTime} AND (rootState.valid_to > ${currentTime} OR rootState.valid_to IS NULL)\n` +
 `MATCH path = (rootState)-[:COMPOSED_OF*]->(leafState:State)-[:temporalPartOf]->(leaf4D:ActualIndividual)\n` +
 `RETURN root4D.id AS root, leaf4D.id AS component, leafState.id AS active_slice;\n` +
-`// Benefit: Native fast traversal over timeless composition links`;
+`// IEC 63339 SMIM: Fast trajectory over timeless state compositions`;
           queryContainer.innerHTML = `<pre class="code-block">${cypher}</pre>`;
         } else {
           queryTag.innerText = 'SPARQL 1.1 (ISO 15926 Pure Binary Triples)';
@@ -905,12 +934,13 @@
 `  ?rootState (iso:hasPart)+ ?activeStateSlice .\n` +
 `  ?activeStateSlice iso:temporalPartOf ?component4D .\n` +
 `}\n` +
-`# Benefit: No reification; uses standard property path (iso:hasPart)+`;
+`# IEC 63339 SMIM: No reification needed; uses property paths (iso:hasPart)+`;
           queryContainer.innerHTML = `<pre class="code-block">${sparql}</pre>`;
         }
       }
     }
 
+    // Core application render pipeline (URMSM to SMS synchronization)
     function render() {
       const t = i18n[currentLang];
       const showHistory = document.getElementById('history-toggle').checked;
@@ -932,9 +962,11 @@
 
       updateLegend();
 
+      // Render end-user BOM hierarchy (URMSM Viewpoint layer)
       const treeContainer = document.getElementById('tree-container');
       treeContainer.innerHTML = `<strong>${ROOT_ID}</strong>` + buildTreeHTML(ROOT_ID, activeEdges);
 
+      // Populate interactive authoring dropdown selectors
       const parentSelect = document.getElementById('parent-select');
       const removeSelect = document.getElementById('remove-select');
       parentSelect.innerHTML = '';
@@ -958,6 +990,7 @@
       // Explicitly invoke database query generator on every render cycle
       generateDatabaseQuery();
 
+      // Render physical storage card (SMS Data in Tool layer)
       const storageTag = document.getElementById('storage-paradigm-tag');
       const storageContent = document.getElementById('storage-content');
       storageTag.innerText = `${currentOntology} / ${currentMode}`;
@@ -978,7 +1011,7 @@
         } else {
           let ttl = `# BFO 3D: RDF Turtle with Reification\n`;
           edgesStore.forEach(e => {
-            const isActive = (e.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
+            const isActive = (edge.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
             if (!isActive && !showHistory) return;
             ttl += `\n_:${e.id} a :TemporalPartMembership ;\n`;
             ttl += `    :hasParent :${e.from} ;\n`;
@@ -1015,10 +1048,12 @@
       }
     }
 
+    // Initial baseline data setup at T = 0
     addPart(ROOT_ID, 'SubAssembly_1', true);
     addPart(ROOT_ID, 'Part_A', true);
     addPart('SubAssembly_1', 'Sensor_X', true);
 
+    // Initialise default user language
     setLanguage('sv');
   </script>
 </body>
