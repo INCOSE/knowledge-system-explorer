@@ -1,0 +1,21 @@
+Style file updated
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# Date:      Sat Sep 12 21:27:43 2026 +0200
+#
+# interactive rebase in progress; onto c99f776
+# Last command done (1 command done):
+#    pick 49e8504 # Split into 3 files, GUI fixed
+#commands remaining.
+# You are currently editing a commit while rebasing branch 'main' on 'c99f776'.
+#
+# Changes to be committed:
+#	new file:   demo.html
+#	new file:   demo_oldvis.html
+#	modified:   index.html
+#	new file:   script.js
+#	deleted:    style.css
+#	new file:   styles.css
+#
