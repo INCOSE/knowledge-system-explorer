@@ -126,7 +126,7 @@
       </div>
     </div>
 
-    <!-- Tier 2: Operational engineering actions (BOM Authoring) -->
+    <!-- Tier 2: Operational engineering actions & file persistence -->
     <div class="deck-row">
       <span class="badge" id="time-display">T = 0</span>
       <button id="step-btn" onclick="advanceTime()"></button>
@@ -148,6 +148,13 @@
       <label style="font-size: 11px; color: #475569; display: flex; align-items: center; gap: 4px;">
         <input type="checkbox" id="history-toggle" checked onchange="render()"> <span id="lbl-history"></span>
       </label>
+
+      <!-- Client-side export and import controls -->
+      <div style="margin-left: auto; display: flex; gap: 6px;">
+        <button id="btn-export" class="secondary" onclick="exportStateToFile()">💾 <span id="lbl-export">Exportera</span></button>
+        <button id="btn-import" class="secondary" onclick="document.getElementById('file-importer').click()">📂 <span id="lbl-import">Importera</span></button>
+        <input type="file" id="file-importer" accept=".json" style="display: none;" onchange="importStateFromFile(event)">
+      </div>
     </div>
   </div>
 
@@ -161,19 +168,16 @@
     
     <!-- Sidebar: 3 inspection cards -->
     <div class="sidebar">
-      <!-- 1. End-user viewpoint (IEC 63339 URMSM BOM View) -->
       <div class="card" style="flex: 0 0 25%;">
         <h4><span id="title-bom"></span> <span style="color:#0284c7; font-weight: normal;">URMSM / Viewpoint</span></h4>
         <div id="tree-container"></div>
       </div>
 
-      <!-- 2. Query complexity inspector (Cypher / SPARQL) -->
       <div class="card" style="flex: 1;">
         <h4><span id="title-query"></span> <span id="query-lang-tag" style="color:#0284c7; font-weight: normal;"></span></h4>
         <div id="query-content"></div>
       </div>
 
-      <!-- 3. Physical data model representation -->
       <div class="card" style="flex: 1;">
         <h4><span id="title-storage"></span> <span id="storage-paradigm-tag" style="color:#0284c7; font-weight: normal;"></span></h4>
         <div id="storage-content"></div>
@@ -182,7 +186,6 @@
   </div>
 
   <script>
-    // Initialise Mermaid rendering configuration
     mermaid.initialize({
       startOnLoad: false,
       theme: 'neutral',
@@ -190,7 +193,6 @@
       flowchart: { curve: 'basis', htmlLabels: true }
     });
 
-    // Multilingual dictionary (Swedish, British English, Russian)
     const i18n = {
       sv: {
         ontoTitle: "Ontologi:",
@@ -202,6 +204,8 @@
         addBtn: "+ Lägg till",
         removeBtn: "Uteslut relation",
         history: "Historik",
+        exportBtn: "Exportera JSON",
+        importBtn: "Importera JSON",
         titleBom: "Struktur (BOM-träd)",
         titleQuery: "Genererad databasfråga",
         titleStorage: "Under huven",
@@ -238,6 +242,8 @@
         addBtn: "+ Add",
         removeBtn: "Sever relation",
         history: "History",
+        exportBtn: "Export JSON",
+        importBtn: "Import JSON",
         titleBom: "BOM Tree Structure",
         titleQuery: "Generated Database Query",
         titleStorage: "Under the Bonnet",
@@ -274,6 +280,8 @@
         addBtn: "+ Добавить",
         removeBtn: "Исключить связь",
         history: "История",
+        exportBtn: "Экспорт JSON",
+        importBtn: "Импорт JSON",
         titleBom: "Состав изделия (BOM)",
         titleQuery: "Генерируемый запрос к БД",
         titleStorage: "Под капотом",
@@ -329,7 +337,6 @@
     const visEdges = new vis.DataSet();
     const visContainer = document.getElementById('vis-container');
 
-    // Vis.js physics setup optimised for readable node separation
     function getVisOptions() {
       const isComplex = (currentMode === 'RDF' || currentOntology === 'ISO15926');
       return {
@@ -365,12 +372,10 @@
 
     const network = new vis.Network(visContainer, { nodes: visNodes, edges: visEdges }, getVisOptions());
 
-    // Sanitise string for safe inclusion in Mermaid grammar
     function safeId(id) {
       return id.replace(/[^a-zA-Z0-9_]/g, '_');
     }
 
-    // Switch current UI language
     function setLanguage(lang) {
       currentLang = lang;
       ['sv', 'en', 'ru'].forEach(l => {
@@ -387,6 +392,8 @@
       document.getElementById('add-btn').innerText = t.addBtn;
       document.getElementById('remove-btn').innerText = t.removeBtn;
       document.getElementById('lbl-history').innerText = t.history;
+      document.getElementById('lbl-export').innerText = t.exportBtn;
+      document.getElementById('lbl-import').innerText = t.importBtn;
       document.getElementById('title-bom').innerText = t.titleBom;
       document.getElementById('title-query').innerText = t.titleQuery;
       document.getElementById('title-storage').innerText = t.titleStorage;
@@ -394,7 +401,6 @@
       render();
     }
 
-    // Switch upper ontology paradigm
     function setOntology(onto) {
       currentOntology = onto;
       document.getElementById('onto-bfo').className = (onto === 'BFO') ? 'active' : '';
@@ -403,7 +409,6 @@
       render();
     }
 
-    // Switch database model paradigm
     function setGraphMode(mode) {
       currentMode = mode;
       document.getElementById('mode-lpg').className = (mode === 'LPG') ? 'active' : '';
@@ -412,7 +417,6 @@
       render();
     }
 
-    // Switch active canvas rendering engine
     function setEngine(engine) {
       currentEngine = engine;
       document.getElementById('eng-vis').className = (engine === 'vis') ? 'active' : '';
@@ -430,7 +434,6 @@
       render();
     }
 
-    // Add component relationship to master store
     function addPart(parentId, name, silent = false) {
       if (!name || !parentId) return;
       const partId = name.trim();
@@ -454,7 +457,6 @@
       if (!silent) render();
     }
 
-    // Handle user submission for adding a part
     function handleAddPart() {
       const parent = document.getElementById('parent-select').value;
       const input = document.getElementById('part-input');
@@ -462,7 +464,6 @@
       input.value = '';
     }
 
-    // Sever relationship at current time coordinate
     function handleRemoveEdge() {
       const edgeId = document.getElementById('remove-select').value;
       const edge = edgesStore.find(e => e.id === edgeId);
@@ -472,14 +473,70 @@
       render();
     }
 
-    // Advance global discrete time coordinate
     function advanceTime() {
       currentTime++;
       document.getElementById('time-display').innerText = `T = ${currentTime}`;
       render();
     }
 
-    // Recursive HTML tree builder for the end-user BOM viewpoint
+    // === Client-side JSON state persistence ===
+    function exportStateToFile() {
+      const statePayload = {
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        currentTime,
+        currentOntology,
+        currentMode,
+        edgeSeq,
+        baseNodes,
+        edgesStore
+      };
+
+      const jsonBlob = new Blob([JSON.stringify(statePayload, null, 2)], { type: "application/json" });
+      const downloadUrl = URL.createObjectURL(jsonBlob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = downloadUrl;
+      downloadLink.download = `workbench_state_T${currentTime}_${currentOntology}_${currentMode}.json`;
+      downloadLink.click();
+      URL.revokeObjectURL(downloadUrl);
+    }
+
+    function importStateFromFile(event) {
+      const selectedFile = event.target.files[0];
+      if (!selectedFile) return;
+
+      const fileReader = new FileReader();
+      fileReader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed.baseNodes || !parsed.edgesStore) {
+            throw new Error("Invalid schema format: missing baseNodes or edgesStore.");
+          }
+
+          currentTime = parsed.currentTime || 0;
+          currentOntology = parsed.currentOntology || 'BFO';
+          currentMode = parsed.currentMode || 'LPG';
+          edgeSeq = parsed.edgeSeq || (parsed.edgesStore.length + 1);
+
+          baseNodes.length = 0;
+          parsed.baseNodes.forEach(node => baseNodes.push(node));
+
+          edgesStore.length = 0;
+          parsed.edgesStore.forEach(edge => edgesStore.push(edge));
+
+          document.getElementById('time-display').innerText = `T = ${currentTime}`;
+          setOntology(currentOntology);
+          setGraphMode(currentMode);
+          render();
+        } catch (err) {
+          alert("Error importing workbench configuration: " + err.message);
+        }
+      };
+
+      fileReader.readAsText(selectedFile);
+      event.target.value = '';
+    }
+
     function buildTreeHTML(nodeId, activeEdges) {
       const children = activeEdges.filter(e => e.from === nodeId).map(e => e.to);
       if (children.length === 0) return '';
@@ -491,14 +548,12 @@
       return html;
     }
 
-    // Compile domain events into Vis.js representation
     function renderVisData(visibleEdges) {
       visNodes.clear();
       visEdges.clear();
 
       if (currentOntology === 'BFO') {
         if (currentMode === 'LPG') {
-          // BFO + LPG: Continuant entities with temporal properties on edges
           baseNodes.forEach(n => {
             visNodes.add({
               id: n.id,
@@ -519,7 +574,6 @@
             });
           });
         } else {
-          // BFO + RDF: W3C reification diamond nodes for temporal relation
           baseNodes.forEach(n => {
             visNodes.add({
               id: n.id,
@@ -554,7 +608,6 @@
           });
         }
       } else {
-        // ISO 15926 (4D Perdurantism)
         baseNodes.forEach(n => {
           visNodes.add({
             id: `4d_${n.id}`,
@@ -584,12 +637,10 @@
             font: { color: '#ffffff' }
           });
 
-          // Link spatial-temporal slices to 4D individual extent
           visEdges.add({ from: parentStateId, to: `4d_${e.from}`, label: 'temporalPartOf', color: '#94a3b8', dashes: true });
           visEdges.add({ from: childStateId, to: `4d_${e.to}`, label: 'temporalPartOf', color: '#94a3b8', dashes: true });
 
           if (currentMode === 'LPG') {
-            // LPG: Tenseless composition with revision attributes
             visEdges.add({
               from: parentStateId,
               to: childStateId,
@@ -601,7 +652,6 @@
             if (!parentStates[e.from]) parentStates[e.from] = [];
             parentStates[e.from].push({ id: parentStateId, edge: e });
           } else {
-            // RDF: Pure binary tenseless predicate
             visEdges.add({
               from: parentStateId,
               to: childStateId,
@@ -612,7 +662,6 @@
           }
         });
 
-        // LPG: Model state transition chain (state progression)
         if (currentMode === 'LPG') {
           Object.keys(parentStates).forEach(parentId => {
             const list = parentStates[parentId];
@@ -630,7 +679,6 @@
       }
     }
 
-    // Compile domain events into Mermaid definition
     function generateMermaidDef(visibleEdges) {
       let def = 'flowchart TD\n';
       def += '  classDef bfoSys fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
@@ -680,7 +728,6 @@
           });
         }
       } else {
-        // ISO 15926 (4D)
         baseNodes.forEach(n => {
           const wId = `whole_${safeId(n.id)}`;
           def += `  ${wId}["<b>${n.label}_4D</b><br/>iso:ActualIndividual"]:::iso4d\n`;
@@ -723,7 +770,6 @@
       return def;
     }
 
-    // Execute Mermaid rendering asynchronously with serialised queue
     async function executeMermaidRender(chartDefinition) {
       if (isRenderingMermaid) {
         pendingMermaidDef = chartDefinition;
@@ -748,7 +794,6 @@
       }
     }
 
-    // Synchronise static legend glyphs with selected ontology and model
     function updateLegend() {
       const leg = i18n[currentLang].legend;
       const container = document.getElementById('graph-legend');
@@ -806,7 +851,6 @@
       }
     }
 
-    // Generate database query required to fetch BOM at time coordinate T
     function generateDatabaseQuery() {
       const queryTag = document.getElementById('query-lang-tag');
       const queryContainer = document.getElementById('query-content');
@@ -840,7 +884,6 @@
           queryContainer.innerHTML = `<pre class="code-block">${sparql}</pre>`;
         }
       } else {
-        // ISO 15926 (4D)
         if (currentMode === 'LPG') {
           queryTag.innerText = 'Cypher (ISO 15926 in LPG)';
           const cypher = `// Traverse 4D states intersecting T = ${currentTime}\n` +
@@ -870,7 +913,6 @@
       }
     }
 
-    // Core application render pipeline
     function render() {
       const t = i18n[currentLang];
       const showHistory = document.getElementById('history-toggle').checked;
@@ -884,21 +926,17 @@
         if (isActive || (isPast && showHistory)) visibleEdges.push({ ...edge, isActive });
       });
 
-      // Render canvas through selected engine
       if (currentEngine === 'vis') {
         renderVisData(visibleEdges);
       } else {
         executeMermaidRender(generateMermaidDef(visibleEdges));
       }
 
-      // Update static legend
       updateLegend();
 
-      // Render end-user BOM hierarchy
       const treeContainer = document.getElementById('tree-container');
       treeContainer.innerHTML = `<strong>${ROOT_ID}</strong>` + buildTreeHTML(ROOT_ID, activeEdges);
 
-      // Populate interactive authoring dropdowns
       const parentSelect = document.getElementById('parent-select');
       const removeSelect = document.getElementById('remove-select');
       parentSelect.innerHTML = '';
@@ -919,10 +957,8 @@
         removeSelect.appendChild(opt);
       });
 
-      // Render query comparison card
       generateDatabaseQuery();
 
-      // Render physical storage card
       const storageTag = document.getElementById('storage-paradigm-tag');
       const storageContent = document.getElementById('storage-content');
       storageTag.innerText = `${currentOntology} / ${currentMode}`;
@@ -953,7 +989,6 @@
           storageContent.innerHTML = `<pre class="code-block">${ttl}</pre>`;
         }
       } else {
-        // ISO 15926
         if (currentMode === 'LPG') {
           let html = `<table><thead><tr><th>Parent Slice</th><th>Child Slice</th><th>LPG Rel Properties</th><th>4D Extent</th></tr></thead><tbody>`;
           visibleEdges.forEach(e => {
@@ -981,12 +1016,10 @@
       }
     }
 
-    // Initial baseline data at T=0
     addPart(ROOT_ID, 'SubAssembly_1', true);
     addPart(ROOT_ID, 'Part_A', true);
     addPart('SubAssembly_1', 'Sensor_X', true);
 
-    // Initialise default localisation
     setLanguage('sv');
   </script>
 </body>
