@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Knowledge Graph Workbench (LPG vs RDF)</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 14px; background: #f8fafc; color: #0f172a; display: flex; flex-direction: column; height: 100vh; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #ffffff; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 10px; }
+    .badge { background: #0284c7; color: #ffffff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 13px; }
+    button { background: #0f172a; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    button:hover { background: #334155; }
+    button.secondary { background: #e2e8f0; color: #0f172a; }
+    button.secondary:hover { background: #cbd5e1; }
+    button.danger { background: #ef4444; }
+    button.danger:hover { background: #dc2626; }
+    .btn-group { display: flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
+    .btn-group button { border-radius: 0; background: #ffffff; color: #475569; padding: 5px 10px; border-right: 1px solid #cbd5e1; }
+    .btn-group button:last-child { border-right: none; }
+    .btn-group button.active { background: #0284c7; color: #ffffff; font-weight: 600; }
+    input, select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    .divider { height: 20px; width: 1px; background: #e2e8f0; margin: 0 4px; }
+    .main-container { display: flex; flex: 1; gap: 10px; min-height: 0; }
+    #graph-canvas { flex: 2; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; position: relative; }
+    .sidebar { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 340px; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; overflow-y: auto; flex: 1; }
+    .card h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; display: flex; justify-content: space-between; }
+    ul.tree, ul.tree ul { list-style-type: none; padding-left: 16px; margin: 4px 0; }
+    ul.tree li { position: relative; padding: 2px 0; font-size: 13px; }
+    ul.tree li::before { content: "├─ "; color: #94a3b8; }
+    ul.tree li:last-child::before { content: "└─ "; color: #94a3b8; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
+    th { color: #64748b; font-weight: 600; }
+    .active-row { background: #f0fdf4; }
+    .closed-row { color: #94a3b8; text-decoration: line-through; }
+    pre.code-block { margin: 0; font-family: monospace; font-size: 11px; color: #334155; line-height: 1.4; background: #f8fafc; padding: 8px; border-radius: 4px; border: 1px solid #e2e8f0; max-height: 180px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <!-- Språkväljare / Language Selector -->
+    <div class="btn-group">
+      <button id="lang-sv" class="active" onclick="setLanguage('sv')">🇸🇪 SV</button>
+      <button id="lang-en" onclick="setLanguage('en')">🇬🇧 EN</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Tidsstyrning -->
+    <span class="badge" id="time-display">T = 0</span>
+    <button id="step-btn" onclick="advanceTime()"></button>
+
+    <div class="divider"></div>
+
+    <!-- Redigering -->
+    <label id="lbl-parent" style="font-size: 12px; color: #64748b;"></label>
+    <select id="parent-select"></select>
+    
+    <input type="text" id="part-input" style="width: 120px;">
+    <button id="add-btn" class="secondary" onclick="handleAddPart()"></button>
+    
+    <div class="divider"></div>
+    <select id="remove-select"></select>
+    <button id="remove-btn" class="danger" onclick="handleRemoveEdge()"></button>
+
+    <div class="divider"></div>
+
+    <!-- Grafmodell / Graph Paradigm -->
+    <div class="btn-group">
+      <button id="mode-lpg" class="active" onclick="setGraphMode('LPG')">LPG</button>
+      <button id="mode-rdf" onclick="setGraphMode('RDF')">RDF (W3C)</button>
+    </div>
+
+    <!-- Visningsinställningar -->
+    <label style="font-size: 12px; color: #475569; display: flex; align-items: center; gap: 4px; margin-left: 6px;">
+      <input type="checkbox" id="layout-toggle" onchange="render()"> <span id="lbl-hierarchy"></span>
+    </label>
+    <label style="font-size: 12px; color: #475569; display: flex; align-items: center; gap: 4px;">
+      <input type="checkbox" id="history-toggle" checked onchange="render()"> <span id="lbl-history"></span>
+    </label>
+  </div>
+
+  <div class="main-container">
+    <div id="graph-canvas"></div>
+    
+    <div class="sidebar">
+      <!-- BOM-vy (Användarperspektiv / Viewpoint) -->
+      <div class="card" style="flex: 0 0 35%;">
+        <h4><span id="title-bom"></span> <span style="color:#0284c7; font-weight: normal;">URMSM / BOM View</span></h4>
+        <div id="tree-container"></div>
+      </div>
+
+      <!-- Under motorhuven: LPG-tabell eller RDF-tripplar -->
+      <div class="card" style="flex: 1;">
+        <h4><span id="title-storage"></span> <span id="storage-paradigm-tag" style="color:#0284c7; font-weight: normal;"></span></h4>
+        <div id="storage-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // i18n lexikon (Svenska och British English)
+    const i18n = {
+      sv: {
+        stepBtn: "Lås steg (T+1)",
+        parent: "Överordnad:",
+        partPlaceholder: "Komponentnamn",
+        addBtn: "+ Lägg till",
+        removeBtn: "Uteslut relation",
+        hierarchy: "Hierarki",
+        history: "Historik",
+        titleBom: "Struktur (BOM-träd)",
+        titleStorage: "Under huven (Datamodell)",
+        activeStatus: "Aktiv",
+        closedStatus: "Avslutad",
+        sourceCol: "Källa",
+        targetCol: "Mål",
+        statusCol: "Status",
+        rootName: "System A"
+      },
+      en: {
+        stepBtn: "Commit step (T+1)",
+        parent: "Parent:",
+        partPlaceholder: "Component name",
+        addBtn: "+ Add",
+        removeBtn: "Sever relation",
+        hierarchy: "Hierarchy",
+        history: "History",
+        titleBom: "BOM Tree Structure",
+        titleStorage: "Under the Bonnet (Data Model)",
+        activeStatus: "Active",
+        closedStatus: "Closed",
+        sourceCol: "Source",
+        targetCol: "Target",
+        statusCol: "Status",
+        rootName: "System A"
+      }
+    };
+
+    let currentLang = 'sv';
+    let currentMode = 'LPG'; // 'LPG' eller 'RDF'
+    let currentTime = 0;
+    const ROOT_ID = 'System_A';
+
+    const baseNodes = [
+      { id: ROOT_ID, label: 'System_A\n(:System)', type: 'system' }
+    ];
+
+    let edgesStore = [];
+    let edgeSeq = 1;
+
+    const visNodes = new vis.DataSet();
+    const visEdges = new vis.DataSet();
+    const container = document.getElementById('graph-canvas');
+    const data = { nodes: visNodes, edges: visEdges };
+
+    function getOptions(isHierarchical) {
+      return {
+        physics: isHierarchical ? false : {
+          stabilization: true,
+          barnesHut: { springLength: currentMode === 'RDF' ? 60 : 100, gravitationalConstant: -3500 }
+        },
+        layout: isHierarchical ? {
+          hierarchical: { direction: 'UD', sortMethod: 'directed', levelSeparation: 80, nodeSpacing: 110 }
+        } : {},
+        nodes: { shape: 'box', margin: 8, font: { size: 12 } },
+        edges: { arrows: 'to', font: { size: 10, align: 'top' } }
+      };
+    }
+
+    const network = new vis.Network(container, data, getOptions(false));
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      document.getElementById('lang-sv').className = (lang === 'sv') ? 'active' : '';
+      document.getElementById('lang-en').className = (lang === 'en') ? 'active' : '';
+
+      const t = i18n[lang];
+      document.getElementById('step-btn').innerText = t.stepBtn;
+      document.getElementById('lbl-parent').innerText = t.parent;
+      document.getElementById('part-input').placeholder = t.partPlaceholder;
+      document.getElementById('add-btn').innerText = t.addBtn;
+      document.getElementById('remove-btn').innerText = t.removeBtn;
+      document.getElementById('lbl-hierarchy').innerText = t.hierarchy;
+      document.getElementById('lbl-history').innerText = t.history;
+      document.getElementById('title-bom').innerText = t.titleBom;
+      document.getElementById('title-storage').innerText = t.titleStorage;
+
+      render();
+    }
+
+    function setGraphMode(mode) {
+      currentMode = mode;
+      document.getElementById('mode-lpg').className = (mode === 'LPG') ? 'active' : '';
+      document.getElementById('mode-rdf').className = (mode === 'RDF') ? 'active' : '';
+      render();
+    }
+
+    function addPart(parentId, name) {
+      if (!name || !parentId) return;
+      const partId = name.trim();
+      if (parentId === partId) return;
+
+      const exists = edgesStore.find(e => e.from === parentId && e.to === partId && e.valid_to === null);
+      if (exists) return;
+
+      if (!baseNodes.some(n => n.id === partId)) {
+        baseNodes.push({ id: partId, label: `${partId}\n(:Element)`, type: 'element' });
+      }
+
+      edgesStore.push({
+        id: 'e' + edgeSeq++,
+        from: parentId,
+        to: partId,
+        valid_from: currentTime,
+        valid_to: null
+      });
+
+      render();
+    }
+
+    function handleAddPart() {
+      const parent = document.getElementById('parent-select').value;
+      const input = document.getElementById('part-input');
+      addPart(parent, input.value);
+      input.value = '';
+    }
+
+    function handleRemoveEdge() {
+      const edgeId = document.getElementById('remove-select').value;
+      const edge = edgesStore.find(e => e.id === edgeId);
+      if (edge && edge.valid_to === null) {
+        edge.valid_to = currentTime;
+      }
+      render();
+    }
+
+    function advanceTime() {
+      currentTime++;
+      document.getElementById('time-display').innerText = `T = ${currentTime}`;
+      render();
+    }
+
+    function buildTreeHTML(nodeId, activeEdges) {
+      const children = activeEdges.filter(e => e.from === nodeId).map(e => e.to);
+      if (children.length === 0) return '';
+      let html = '<ul class="tree">';
+      children.forEach(childId => {
+        html += `<li><strong>${childId}</strong>${buildTreeHTML(childId, activeEdges)}</li>`;
+      });
+      html += '</ul>';
+      return html;
+    }
+
+    function render() {
+      const t = i18n[currentLang];
+      const showHistory = document.getElementById('history-toggle').checked;
+      const isHierarchical = document.getElementById('layout-toggle').checked;
+
+      // 1. Filtrera aktiva och historiska relationer
+      const activeEdges = [];
+      const visibleEdges = [];
+      edgesStore.forEach(edge => {
+        const isActive = (edge.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
+        const isPast = edge.valid_to !== null && edge.valid_to <= currentTime;
+        if (isActive) activeEdges.push(edge);
+        if (isActive || (isPast && showHistory)) visibleEdges.push({ ...edge, isActive });
+      });
+
+      // 2. Uppdatera grafelement beroende på LPG eller RDF
+      visNodes.clear();
+      visEdges.clear();
+
+      if (currentMode === 'LPG') {
+        // === LPG-MODUS: Egenskaper direkt på relationer ===
+        baseNodes.forEach(node => {
+          visNodes.add({
+            id: node.id,
+            label: node.label,
+            color: node.type === 'system' ? '#0284c7' : '#64748b',
+            font: { color: '#ffffff', bold: node.type === 'system' }
+          });
+        });
+
+        visibleEdges.forEach(e => {
+          visEdges.add({
+            id: e.id,
+            from: e.from,
+            to: e.to,
+            label: e.isActive ? `HAS_PART [T${e.valid_from}..∞]` : `HAS_PART [T${e.valid_from}..T${e.valid_to}]`,
+            color: e.isActive ? { color: '#10b981', highlight: '#059669' } : { color: '#cbd5e1' },
+            dashes: !e.isActive,
+            width: e.isActive ? 2 : 1
+          });
+        });
+
+      } else {
+        // === RDF-MODUS: W3C Standard Reifiering (N-ära relationer) ===
+        baseNodes.forEach(node => {
+          visNodes.add({
+            id: node.id,
+            label: `:${node.id}\na :Component`,
+            color: node.type === 'system' ? '#0284c7' : '#475569',
+            font: { color: '#ffffff' }
+          });
+        });
+
+        visibleEdges.forEach(e => {
+          const stmtId = `stmt_${e.id}`;
+          const litFromId = `lit_from_${e.id}`;
+          const litToId = `lit_to_${e.id}`;
+
+          // Reifieringsnod (_:statement / n-ary membership)
+          visNodes.add({
+            id: stmtId,
+            label: `_:${e.id}\n(a :TemporalPartMembership)`,
+            shape: 'diamond',
+            color: e.isActive ? '#f59e0b' : '#e2e8f0',
+            font: { size: 10, color: e.isActive ? '#000000' : '#94a3b8' }
+          });
+
+          // Binära RDF-tripplar
+          visEdges.add({ from: stmtId, to: e.from, label: ':hasParent', arrows: 'to', color: '#94a3b8' });
+          visEdges.add({ from: stmtId, to: e.to, label: ':hasChild', arrows: 'to', color: '#94a3b8' });
+
+          // Literaler för tidsstämplar
+          visNodes.add({
+            id: litFromId,
+            label: `"T${e.valid_from}"^^xsd:int`,
+            shape: 'ellipse',
+            color: '#f1f5f9',
+            font: { size: 9, color: '#475569' }
+          });
+          visEdges.add({ from: stmtId, to: litFromId, label: ':validFrom', arrows: 'to', color: '#cbd5e1' });
+
+          if (e.valid_to !== null) {
+            visNodes.add({
+              id: litToId,
+              label: `"T${e.valid_to}"^^xsd:int`,
+              shape: 'ellipse',
+              color: '#f1f5f9',
+              font: { size: 9, color: '#94a3b8' }
+            });
+            visEdges.add({ from: stmtId, to: litToId, label: ':validTo', arrows: 'to', color: '#cbd5e1', dashes: true });
+          }
+        });
+      }
+
+      network.setOptions(getOptions(isHierarchical));
+
+      // 3. BOM-träd (Förblir identiskt för användaren!)
+      const treeContainer = document.getElementById('tree-container');
+      treeContainer.innerHTML = `<strong>${ROOT_ID}</strong>` + buildTreeHTML(ROOT_ID, activeEdges);
+
+      // 4. Uppdatera UI-kontroller
+      const parentSelect = document.getElementById('parent-select');
+      const removeSelect = document.getElementById('remove-select');
+      parentSelect.innerHTML = '';
+      removeSelect.innerHTML = '';
+
+      const activeNodes = new Set([ROOT_ID]);
+      activeEdges.forEach(e => { activeNodes.add(e.from); activeNodes.add(e.to); });
+      activeNodes.forEach(id => {
+        const opt = document.createElement('option');
+        opt.value = id; opt.innerText = id;
+        parentSelect.appendChild(opt);
+      });
+
+      activeEdges.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        opt.innerText = `${e.from} → ${e.to}`;
+        removeSelect.appendChild(opt);
+      });
+
+      // 5. Informationsvy under motorhuven
+      const storageTag = document.getElementById('storage-paradigm-tag');
+      const storageContent = document.getElementById('storage-content');
+
+      if (currentMode === 'LPG') {
+        storageTag.innerText = 'LPG (Property Graph)';
+        let html = `<table><thead><tr><th>${t.sourceCol}</th><th>${t.targetCol}</th><th>valid_from</th><th>valid_to</th><th>${t.statusCol}</th></tr></thead><tbody>`;
+        edgesStore.forEach(edge => {
+          const isActive = (edge.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
+          html += `<tr class="${isActive ? 'active-row' : 'closed-row'}">
+            <td>${edge.from}</td><td><strong>${edge.to}</strong></td>
+            <td>T${edge.valid_from}</td><td>${edge.valid_to !== null ? 'T' + edge.valid_to : '—'}</td>
+            <td>${isActive ? t.activeStatus : t.closedStatus}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        storageContent.innerHTML = html;
+      } else {
+        storageTag.innerText = 'RDF Turtle / Triples';
+        let ttl = `# W3C RDF Serialization (Closed World Reification)\n`;
+        edgesStore.forEach(e => {
+          const isActive = (e.valid_to === null || e.valid_to > currentTime) && e.valid_from <= currentTime;
+          if (!isActive && !showHistory) return;
+          ttl += `\n_:${e.id} a :TemporalPartMembership ;\n`;
+          ttl += `    :hasParent :${e.from} ;\n`;
+          ttl += `    :hasChild  :${e.to} ;\n`;
+          ttl += `    :validFrom "${e.valid_from}"^^xsd:integer ${e.valid_to !== null ? ';\n    :validTo   "' + e.valid_to + '"^^xsd:integer .' : ' .'}\n`;
+        });
+        storageContent.innerHTML = `<pre class="code-block">${ttl}</pre>`;
+      }
+    }
+
+    // Initiera standardläge
+    setLanguage('sv');
+    addPart(ROOT_ID, 'SubAssembly_1');
+    addPart(ROOT_ID, 'Part_A');
+    addPart('SubAssembly_1', 'Sensor_X');
+  </script>
+</body>
+</html>

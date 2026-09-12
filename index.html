@@ -3,147 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <title>IEC 63339 Knowledge Architecture Workbench</title>
+  <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.min.js"></script>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-  <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 12px; background: #f8fafc; color: #0f172a; display: flex; flex-direction: column; height: 100vh; }
-    
-    .control-deck { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .deck-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 14px; }
-    .deck-row-top { background: #f1f5f9; border-bottom: 1px solid #e2e8f0; border-top-left-radius: 7px; border-top-right-radius: 7px; }
-    
-    .badge { background: #0284c7; color: #ffffff; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
-    .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; display: flex; align-items: center; gap: 4px; }
-    
-    /* Интерактивные бейджи стандарта IEC 63339 с подсказками */
-    .iec-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      background: #e0f2fe;
-      color: #0369a1;
-      border: 1px solid #7dd3fc;
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      cursor: help;
-      position: relative;
-    }
-    .iec-badge:hover .iec-tooltip {
-      visibility: visible;
-      opacity: 1;
-    }
-    .iec-tooltip {
-      visibility: hidden;
-      opacity: 0;
-      position: absolute;
-      top: 130%;
-      left: 0;
-      z-index: 100;
-      background: #0f172a;
-      color: #f8fafc;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 400;
-      line-height: 1.35;
-      min-width: 250px;
-      max-width: 320px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-      transition: opacity 0.15s ease-in-out;
-      pointer-events: none;
-    }
-    .iec-tooltip::after {
-      content: "";
-      position: absolute;
-      bottom: 100%;
-      left: 14px;
-      border-width: 5px;
-      border-style: solid;
-      border-color: transparent transparent #0f172a transparent;
-    }
-
-    button { background: #0f172a; color: #ffffff; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
-    button:hover { background: #334155; }
-    button.secondary { background: #e2e8f0; color: #0f172a; }
-    button.secondary:hover { background: #cbd5e1; }
-    button.danger { background: #ef4444; }
-    button.danger:hover { background: #dc2626; }
-    
-    .btn-group { display: flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; background: #ffffff; }
-    .btn-group button { border-radius: 0; background: #ffffff; color: #475569; padding: 4px 10px; border-right: 1px solid #cbd5e1; font-size: 12px; font-weight: 600; line-height: 1.2; }
-    .btn-group button:last-child { border-right: none; }
-    .btn-group button.active { background: #0284c7; color: #ffffff; }
-    .btn-group.flag-group button { font-size: 15px; padding: 3px 8px; }
-    
-    input, select { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
-    .divider { height: 18px; width: 1px; background: #cbd5e1; margin: 0 4px; }
-    
-    .main-container { display: flex; flex: 1; gap: 10px; min-height: 0; }
-    #canvas-container { flex: 2; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; position: relative; overflow: hidden; }
-    #vis-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-    #mermaid-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: auto; padding: 24px 24px 140px 24px; display: flex; justify-content: center; align-items: flex-start; background: #ffffff; }
-    #mermaid-container svg { width: auto; height: auto; max-width: none; }
-    
-    .graph-legend {
-      position: absolute;
-      bottom: 12px;
-      left: 12px;
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(4px);
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 10px 14px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      font-size: 11px;
-      color: #334155;
-      z-index: 20;
-      max-width: 330px;
-    }
-    .legend-title { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 6px; display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-    .legend-section { margin-top: 5px; }
-    .legend-section-title { font-weight: 600; color: #64748b; font-size: 10px; margin-bottom: 3px; text-transform: uppercase; }
-    .legend-item { display: flex; align-items: center; margin-bottom: 3px; line-height: 1.25; }
-    
-    .swatch-box-sys { width: 13px; height: 11px; background: #0284c7; border: 1px solid #0369a1; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
-    .swatch-box-elem { width: 13px; height: 11px; background: #64748b; border: 1px solid #475569; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
-    .swatch-box-4d { width: 13px; height: 11px; background: #4f46e5; border: 1px solid #3730a3; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
-    .swatch-box-state { width: 13px; height: 11px; background: #0d9488; border: 1px solid #0f766e; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
-    .swatch-diamond { width: 9px; height: 9px; background: #f59e0b; border: 1px solid #d97706; transform: rotate(45deg); margin: 0 10px 0 2px; flex-shrink: 0; }
-    .swatch-literal { width: 14px; height: 9px; background: #f1f5f9; border: 1px dashed #94a3b8; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
-    .swatch-line-active { width: 16px; height: 2px; background: #10b981; margin-right: 8px; flex-shrink: 0; }
-    .swatch-line-past { width: 16px; height: 0; border-top: 2px dashed #94a3b8; margin-right: 8px; flex-shrink: 0; }
-    .swatch-line-transition { width: 16px; height: 2px; background: #f59e0b; margin-right: 8px; flex-shrink: 0; }
-
-    .sidebar { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 350px; }
-    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; overflow-y: auto; flex: 1; }
-    .card h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; display: flex; justify-content: space-between; align-items: center; }
-    ul.tree, ul.tree ul { list-style-type: none; padding-left: 16px; margin: 4px 0; }
-    ul.tree li { position: relative; padding: 2px 0; font-size: 13px; }
-    ul.tree li::before { content: "├─ "; color: #94a3b8; }
-    ul.tree li:last-child::before { content: "└─ "; color: #94a3b8; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
-    th { color: #64748b; font-weight: 600; }
-    .active-row { background: #f0fdf4; }
-    .closed-row { color: #94a3b8; text-decoration: line-through; }
-    pre.code-block { margin: 0; font-family: monospace; font-size: 11px; color: #334155; line-height: 1.4; background: #f8fafc; padding: 8px; border-radius: 4px; border: 1px solid #e2e8f0; max-height: 180px; overflow-y: auto; }
-  </style>
 </head>
 <body>
 
   <div class="control-deck">
     <!-- ЯРУС 1: Архитектурные уровни IEC 63339 (SMIM & SMS) -->
     <div class="deck-row deck-row-top">
-      
-      <!-- SMIM: Top-Level Ontology -->
       <div class="section-label">
-        <span class="iec-badge">IEC 63339 / SMIM
-          <span class="iec-tooltip" id="tt-smim"></span>
-        </span>
+        <span class="iec-badge">IEC 63339 / SMIM<span class="iec-tooltip" id="tt-smim"></span></span>
         <span id="lbl-onto-title">Ontologi:</span>
       </div>
       <div class="btn-group">
@@ -153,11 +23,8 @@
 
       <div class="divider"></div>
 
-      <!-- SMS: Graph Database Storage -->
       <div class="section-label">
-        <span class="iec-badge">IEC 63339 / SMS
-          <span class="iec-tooltip" id="tt-sms"></span>
-        </span>
+        <span class="iec-badge">IEC 63339 / SMS<span class="iec-tooltip" id="tt-sms"></span></span>
         <span id="lbl-graph-title">Datamodell:</span>
       </div>
       <div class="btn-group">
@@ -167,7 +34,6 @@
 
       <div class="divider"></div>
 
-      <!-- Визуализатор -->
       <div class="section-label">🎨 <span id="lbl-engine-title">Motor:</span></div>
       <div class="btn-group">
         <button id="eng-vis" class="active" onclick="setEngine('vis')">🌐 Vis.js</button>
@@ -188,7 +54,6 @@
 
       <div class="divider"></div>
 
-      <!-- Зафиксированная Domain Ontology (SMRM) -->
       <span class="iec-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">
         IEC 63339 / SMRM: <span id="lbl-smrm-status" style="font-weight: normal; margin-left: 3px;">Domain Ontology (Fixed: System/IDO)</span>
         <span class="iec-tooltip" id="tt-smrm"></span>
@@ -211,6 +76,12 @@
       <label style="font-size: 11px; color: #475569; display: flex; align-items: center; gap: 4px;">
         <input type="checkbox" id="history-toggle" checked onchange="render()"> <span id="lbl-history"></span>
       </label>
+
+      <!-- Сохранение/Загрузка -->
+      <div class="divider"></div>
+      <button id="save-btn" class="secondary" onclick="exportData()"></button>
+      <button id="load-btn" class="secondary" onclick="document.getElementById('file-input').click()"></button>
+      <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importData(event)">
     </div>
   </div>
 
@@ -221,760 +92,44 @@
       <div id="graph-legend" class="graph-legend"></div>
     </div>
     
+    <!-- Ползунок для горизонтального изменения размеров панелей -->
+    <div class="resizer" id="panel-resizer"></div>
+    
     <div class="sidebar">
       <!-- URMSM: Viewpoint & Concerns -->
-      <div class="card" style="flex: 0 0 35%;">
+      <div class="card" id="card-bom" style="flex: 0 0 25%;">
         <h4>
           <span id="title-bom"></span>
-          <span class="iec-badge">IEC 63339 / URMSM
-            <span class="iec-tooltip" id="tt-urmsm"></span>
-          </span>
+          <!-- Добавлен класс align-right для выравнивания тултипа влево от края экрана -->
+          <span class="iec-badge align-right">IEC 63339 / URMSM<span class="iec-tooltip" id="tt-urmsm"></span></span>
         </h4>
-        <div id="tree-container"></div>
+        <div id="tree-container" style="overflow-y: auto;"></div>
       </div>
 
+      <div class="resizer-h" id="resizer-bom-storage"></div>
+
       <!-- SMS: Low-Level Storage Details -->
-      <div class="card" style="flex: 1;">
+      <div class="card" id="card-storage" style="flex: 0 0 40%;">
         <h4>
           <span id="title-storage"></span>
           <span id="storage-paradigm-tag" style="color:#0284c7; font-weight: 600;"></span>
         </h4>
-        <div id="storage-content"></div>
+        <div id="storage-content" style="overflow-y: auto; display: flex; flex-direction: column;"></div>
+      </div>
+
+      <div class="resizer-h" id="resizer-storage-query"></div>
+
+      <!-- DB Query Panel -->
+      <div class="card" id="card-query" style="flex: 1;">
+        <h4>
+          <span id="title-query"></span>
+          <span id="query-desc" style="font-weight: normal; text-transform: none; color: #0d9488;"></span>
+        </h4>
+        <div id="query-content" style="display: flex; flex-direction: column; flex: 1;"></div>
       </div>
     </div>
   </div>
 
-  <script>
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'neutral',
-      securityLevel: 'loose',
-      flowchart: { curve: 'basis', htmlLabels: true }
-    });
-
-    const i18n = {
-      sv: {
-        ontoTitle: "Ontologi:",
-        graphTitle: "Datamodell:",
-        engineTitle: "Grafmotor:",
-        stepBtn: "Lås steg (T+1)",
-        parent: "Överordnad:",
-        partPlaceholder: "Komponentnamn",
-        addBtn: "+ Lägg till",
-        removeBtn: "Uteslut relation",
-        history: "Historik",
-        titleBom: "Struktur (BOM-träd)",
-        titleStorage: "Under huven",
-        activeStatus: "Aktiv",
-        closedStatus: "Avslutad",
-        sourceCol: "Källa",
-        targetCol: "Mål",
-        statusCol: "Status",
-        smrmStatus: "Domänontologi (Låst: System/IDO)",
-        tooltips: {
-          urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Definierar intressentens perspektiv (ISO 42010 Viewpoint). Användaren ser bara BOM-strukturen vid tidpunkten T, oavsett underliggande IT-lager.",
-          smrm: "<b>SMRM (Concept Repository)</b><br/>Domänontologi och gemensam begreppsbank (System, Component, Physical/Functional Object). Här låst till standardiserad produktnedbrytning.",
-          smim: "<b>SMIM (Information Elements & Rules)</b><br/>Top-Level Ontology (TLO). Formella regler för hur begreppen existerar i tiden: 3D-objekt med tidsintervall (BFO) eller 4D-rumtidsindivider (ISO 15926).",
-          sms: "<b>SMS (Data in Tool)</b><br/>Den faktiska IT-implementationen och datalagringen (Property Graph / Neo4j kontra W3C RDF Triples)."
-        },
-        legend: {
-          title: "Teckenförklaring",
-          nodes: "Noder",
-          edges: "Relationer",
-          bfoSys: "Continuant / System (:System)",
-          bfoElem: "Continuant / Komponent (:Element)",
-          bfoActiveEdge: "Aktiv relation [giltig till nu]",
-          bfoPastEdge: "Historisk relation (avslutad)",
-          iso4d: "4D-individ (Spatio-Temporal Extent)",
-          isoState: "Temporal del / Tillstånd (State)",
-          isoPartRel: "Tidlös komposition (hasPart)",
-          isoSliceRel: "temporalPartOf (del av 4D-individ)",
-          isoTransitionRel: "TRANSITION_TO (tillståndskedja i LPG)",
-          rdfStmt: "Reifiering (_:statement)",
-          rdfLit: "Literal (tidsstämpel xsd:int)",
-          rdfPred: "RDF-predikat"
-        }
-      },
-      en: {
-        ontoTitle: "Ontology:",
-        graphTitle: "Data Model:",
-        engineTitle: "Renderer:",
-        stepBtn: "Commit step (T+1)",
-        parent: "Parent:",
-        partPlaceholder: "Component name",
-        addBtn: "+ Add",
-        removeBtn: "Sever relation",
-        history: "History",
-        titleBom: "BOM Tree Structure",
-        titleStorage: "Under the Bonnet",
-        activeStatus: "Active",
-        closedStatus: "Closed",
-        sourceCol: "Source",
-        targetCol: "Target",
-        statusCol: "Status",
-        smrmStatus: "Domain Ontology (Fixed: System/IDO)",
-        tooltips: {
-          urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Captures the stakeholder concern and viewpoint (ISO 42010). The engineer always sees a unified BOM snapshot at time T, decoupled from graph mechanics.",
-          smrm: "<b>SMRM (Concept Repository)</b><br/>Domain Ontology: the shared engineering lexicon (System, System Element, Physical/Functional Object). Fixed here to ISO-aligned decomposition.",
-          smim: "<b>SMIM (Information Elements & Rules)</b><br/>Top-Level Ontology (TLO). Axiomatic rules governing time and identity: 3D Continuants (BFO) vs 4D Spatio-Temporal Extents (ISO 15926).",
-          sms: "<b>SMS (Data in Tool)</b><br/>Low-level physical IT implementation: Labeled Property Graphs (Neo4j style) vs W3C RDF Triples and serialized statements."
-        },
-        legend: {
-          title: "Graph Legend",
-          nodes: "Node Types",
-          edges: "Relationships",
-          bfoSys: "Continuant / System (:System)",
-          bfoElem: "Continuant / Component (:Element)",
-          bfoActiveEdge: "Active relation [valid to now]",
-          bfoPastEdge: "Historical relation (closed)",
-          iso4d: "4D Individual (Spatio-Temporal Extent)",
-          isoState: "Temporal Part / State",
-          isoPartRel: "Tenseless Composition (hasPart)",
-          isoSliceRel: "temporalPartOf (Extent link)",
-          isoTransitionRel: "TRANSITION_TO (State Chain in LPG)",
-          rdfStmt: "Reification Node (_:statement)",
-          rdfLit: "Literal (xsd:int timestamp)",
-          rdfPred: "RDF Predicate"
-        }
-      },
-      ru: {
-        ontoTitle: "Онтология:",
-        graphTitle: "Модель данных:",
-        engineTitle: "Движок:",
-        stepBtn: "Зафиксировать шаг (T+1)",
-        parent: "Родитель:",
-        partPlaceholder: "Имя компонента",
-        addBtn: "+ Добавить",
-        removeBtn: "Исключить связь",
-        history: "История",
-        titleBom: "Состав изделия (BOM)",
-        titleStorage: "Под капотом",
-        activeStatus: "Активна",
-        closedStatus: "Закрыта",
-        sourceCol: "Источник",
-        targetCol: "Цель",
-        statusCol: "Статус",
-        smrmStatus: "Domain Ontology (Зафиксирована: System/IDO)",
-        tooltips: {
-          urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Уровень точки зрения пользователя (ISO 42010). Инженер всегда видит чистый срез BOM на момент времени T, абстрагированный от структуры базы данных.",
-          smrm: "<b>SMRM (Concept Repository)</b><br/>Онтология предметной области (Domain Ontology). Общий словарь понятий проекта (System, Component, Physical Object). Зафиксирована на базовой декомпозиции.",
-          smim: "<b>SMIM (Information Elements & Rules)</b><br/>Верхнеуровневая онтология (TLO). Математические аксиомы бытия и времени: 3D-тела с интервалами связей (BFO) или 4D-объемы пространства-времени (ISO 15926).",
-          sms: "<b>SMS (Data in Tool)</b><br/>Физическое IT-хранилище в конкретной СУБД: узлы и свойства на ребрах (LPG) против атомарных триплетов URI (W3C RDF)."
-        },
-        legend: {
-          title: "Легенда графа",
-          nodes: "Типы узлов",
-          edges: "Типы связей",
-          bfoSys: "Континуант / Система (:System)",
-          bfoElem: "Континуант / Компонент (:Element)",
-          bfoActiveEdge: "Активная связь [действует сейчас]",
-          bfoPastEdge: "Архивная связь (закрыта)",
-          iso4d: "4D-индивид (Пространственно-временной объем)",
-          isoState: "Темпоральный срез / Состояние",
-          isoPartRel: "Вневременной состав (hasPart)",
-          isoSliceRel: "temporalPartOf (связь с 4D-целым)",
-          isoTransitionRel: "TRANSITION_TO (цепочка состояний в LPG)",
-          rdfStmt: "Узел реификации (_:statement)",
-          rdfLit: "Литерал (метка времени xsd:int)",
-          rdfPred: "RDF-предикат"
-        }
-      }
-    };
-
-    let currentLang = 'sv';
-    let currentOntology = 'BFO';       // 'BFO' | 'ISO15926'
-    let currentMode = 'LPG';            // 'LPG' | 'RDF'
-    let currentEngine = 'vis';          // 'vis' | 'mermaid'
-    let currentTime = 0;
-    const ROOT_ID = 'System_A';
-
-    const baseNodes = [
-      { id: ROOT_ID, label: 'System_A', type: 'system' }
-    ];
-
-    let edgesStore = [];
-    let edgeSeq = 1;
-    let mermaidCounter = 0;
-
-    let isRenderingMermaid = false;
-    let pendingMermaidDef = null;
-
-    const visNodes = new vis.DataSet();
-    const visEdges = new vis.DataSet();
-    const visContainer = document.getElementById('vis-container');
-
-    function getVisOptions() {
-      const isComplex = (currentMode === 'RDF' || currentOntology === 'ISO15926');
-      return {
-        physics: {
-          stabilization: { iterations: 120 },
-          barnesHut: {
-            gravitationalConstant: isComplex ? -24000 : -10000,
-            centralGravity: 0.25,
-            springLength: isComplex ? 220 : 150,
-            springConstant: 0.04,
-            damping: 0.09,
-            avoidOverlap: 1
-          }
-        },
-        nodes: {
-          shape: 'box',
-          margin: 10,
-          font: { size: 12, face: 'system-ui' },
-          borderWidth: 1.5
-        },
-        edges: {
-          arrows: 'to',
-          smooth: { type: 'continuous', roundness: 0.2 },
-          font: {
-            size: 10,
-            align: 'middle',
-            background: '#ffffff',
-            strokeWidth: 0
-          }
-        }
-      };
-    }
-
-    const network = new vis.Network(visContainer, { nodes: visNodes, edges: visEdges }, getVisOptions());
-
-    function safeId(id) {
-      return id.replace(/[^a-zA-Z0-9_]/g, '_');
-    }
-
-    function setLanguage(lang) {
-      currentLang = lang;
-      ['sv', 'en', 'ru'].forEach(l => {
-        document.getElementById(`lang-${l}`).className = (lang === l) ? 'active' : '';
-      });
-
-      const t = i18n[lang];
-      document.getElementById('lbl-onto-title').innerText = t.ontoTitle;
-      document.getElementById('lbl-graph-title').innerText = t.graphTitle;
-      document.getElementById('lbl-engine-title').innerText = t.engineTitle;
-      document.getElementById('step-btn').innerText = t.stepBtn;
-      document.getElementById('lbl-parent').innerText = t.parent;
-      document.getElementById('part-input').placeholder = t.partPlaceholder;
-      document.getElementById('add-btn').innerText = t.addBtn;
-      document.getElementById('remove-btn').innerText = t.removeBtn;
-      document.getElementById('lbl-history').innerText = t.history;
-      document.getElementById('title-bom').innerText = t.titleBom;
-      document.getElementById('title-storage').innerText = t.titleStorage;
-      document.getElementById('lbl-smrm-status').innerText = t.smrmStatus;
-
-      // Локализация тултипов IEC 63339
-      document.getElementById('tt-urmsm').innerHTML = t.tooltips.urmsm;
-      document.getElementById('tt-smrm').innerHTML = t.tooltips.smrm;
-      document.getElementById('tt-smim').innerHTML = t.tooltips.smim;
-      document.getElementById('tt-sms').innerHTML = t.tooltips.sms;
-
-      render();
-    }
-
-    function setOntology(onto) {
-      currentOntology = onto;
-      document.getElementById('onto-bfo').className = (onto === 'BFO') ? 'active' : '';
-      document.getElementById('onto-iso').className = (onto === 'ISO15926') ? 'active' : '';
-      network.setOptions(getVisOptions());
-      render();
-    }
-
-    function setGraphMode(mode) {
-      currentMode = mode;
-      document.getElementById('mode-lpg').className = (mode === 'LPG') ? 'active' : '';
-      document.getElementById('mode-rdf').className = (mode === 'RDF') ? 'active' : '';
-      network.setOptions(getVisOptions());
-      render();
-    }
-
-    function setEngine(engine) {
-      currentEngine = engine;
-      document.getElementById('eng-vis').className = (engine === 'vis') ? 'active' : '';
-      document.getElementById('eng-mermaid').className = (engine === 'mermaid') ? 'active' : '';
-
-      if (engine === 'vis') {
-        document.getElementById('vis-container').style.display = 'block';
-        document.getElementById('mermaid-container').style.display = 'none';
-        network.setOptions(getVisOptions());
-        network.fit();
-      } else {
-        document.getElementById('vis-container').style.display = 'none';
-        document.getElementById('mermaid-container').style.display = 'flex';
-      }
-      render();
-    }
-
-    function addPart(parentId, name, silent = false) {
-      if (!name || !parentId) return;
-      const partId = name.trim();
-      if (parentId === partId) return;
-
-      const exists = edgesStore.find(e => e.from === parentId && e.to === partId && e.valid_to === null);
-      if (exists) return;
-
-      if (!baseNodes.some(n => n.id === partId)) {
-        baseNodes.push({ id: partId, label: partId, type: 'element' });
-      }
-
-      edgesStore.push({
-        id: 'e' + edgeSeq++,
-        from: parentId,
-        to: partId,
-        valid_from: currentTime,
-        valid_to: null
-      });
-
-      if (!silent) render();
-    }
-
-    function handleAddPart() {
-      const parent = document.getElementById('parent-select').value;
-      const input = document.getElementById('part-input');
-      addPart(parent, input.value);
-      input.value = '';
-    }
-
-    function handleRemoveEdge() {
-      const edgeId = document.getElementById('remove-select').value;
-      const edge = edgesStore.find(e => e.id === edgeId);
-      if (edge && edge.valid_to === null) {
-        edge.valid_to = currentTime;
-      }
-      render();
-    }
-
-    function advanceTime() {
-      currentTime++;
-      document.getElementById('time-display').innerText = `T = ${currentTime}`;
-      render();
-    }
-
-    function buildTreeHTML(nodeId, activeEdges) {
-      const children = activeEdges.filter(e => e.from === nodeId).map(e => e.to);
-      if (children.length === 0) return '';
-      let html = '<ul class="tree">';
-      children.forEach(childId => {
-        html += `<li><strong>${childId}</strong>${buildTreeHTML(childId, activeEdges)}</li>`;
-      });
-      html += '</ul>';
-      return html;
-    }
-
-    function renderVisData(visibleEdges) {
-      visNodes.clear();
-      visEdges.clear();
-
-      if (currentOntology === 'BFO') {
-        if (currentMode === 'LPG') {
-          baseNodes.forEach(n => {
-            visNodes.add({
-              id: n.id,
-              label: `${n.label}\n(:bfo:MaterialEntity)`,
-              color: n.type === 'system' ? '#0284c7' : '#64748b',
-              font: { color: '#ffffff', bold: n.type === 'system' }
-            });
-          });
-          visibleEdges.forEach(e => {
-            visEdges.add({
-              id: e.id,
-              from: e.from,
-              to: e.to,
-              label: e.isActive ? `has_part: [T${e.valid_from}..now]` : `has_part: [T${e.valid_from}..T${e.valid_to}]`,
-              color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
-              dashes: !e.isActive,
-              width: e.isActive ? 2 : 1
-            });
-          });
-        } else {
-          baseNodes.forEach(n => {
-            visNodes.add({
-              id: n.id,
-              label: `:${n.label}\na bfo:MaterialEntity`,
-              color: n.type === 'system' ? '#0284c7' : '#475569',
-              font: { color: '#ffffff' }
-            });
-          });
-          visibleEdges.forEach(e => {
-            const stmtId = `stmt_${e.id}`;
-            const litFromId = `lit_from_${e.id}`;
-            const litToId = `lit_to_${e.id}`;
-
-            visNodes.add({
-              id: stmtId,
-              label: `_:${e.id}\na :TemporalPartMembership`,
-              shape: 'diamond',
-              size: 26,
-              color: e.isActive ? '#f59e0b' : '#e2e8f0',
-              font: { size: 9, color: e.isActive ? '#000000' : '#64748b' }
-            });
-
-            visEdges.add({ from: stmtId, to: e.from, label: ':hasParent', color: '#94a3b8' });
-            visEdges.add({ from: stmtId, to: e.to, label: ':hasChild', color: '#94a3b8' });
-            visNodes.add({ id: litFromId, label: `"T${e.valid_from}"^^xsd:int`, shape: 'box', color: '#f8fafc', font: { size: 8 } });
-            visEdges.add({ from: stmtId, to: litFromId, label: ':validFrom', color: '#cbd5e1' });
-
-            if (e.valid_to !== null) {
-              visNodes.add({ id: litToId, label: `"T${e.valid_to}"^^xsd:int`, shape: 'box', color: '#f8fafc', font: { size: 8 } });
-              visEdges.add({ from: stmtId, to: litToId, label: ':validTo', color: '#cbd5e1', dashes: true });
-            }
-          });
-        }
-      } else {
-        // ISO 15926
-        baseNodes.forEach(n => {
-          visNodes.add({
-            id: `4d_${n.id}`,
-            label: `${n.label}_4D\n(iso:ActualIndividual)`,
-            color: '#4f46e5',
-            font: { color: '#ffffff', bold: true }
-          });
-        });
-
-        const parentStates = {};
-
-        visibleEdges.forEach(e => {
-          const parentStateId = `st_${e.from}_${e.id}`;
-          const childStateId = `st_${e.to}_${e.id}`;
-          const timeSpan = e.isActive ? `[T${e.valid_from}..now]` : `[T${e.valid_from}..T${e.valid_to}]`;
-
-          visNodes.add({
-            id: parentStateId,
-            label: `${e.from}_State\n${timeSpan}`,
-            color: '#0d9488',
-            font: { color: '#ffffff' }
-          });
-          visNodes.add({
-            id: childStateId,
-            label: `${e.to}_State\n${timeSpan}`,
-            color: '#0d9488',
-            font: { color: '#ffffff' }
-          });
-
-          visEdges.add({ from: parentStateId, to: `4d_${e.from}`, label: 'temporalPartOf', color: '#94a3b8', dashes: true });
-          visEdges.add({ from: childStateId, to: `4d_${e.to}`, label: 'temporalPartOf', color: '#94a3b8', dashes: true });
-
-          if (currentMode === 'LPG') {
-            visEdges.add({
-              from: parentStateId,
-              to: childStateId,
-              label: `COMPOSED_OF\n{qty:1, rev:'${e.id}'}`,
-              color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
-              width: e.isActive ? 2 : 1
-            });
-            if (!parentStates[e.from]) parentStates[e.from] = [];
-            parentStates[e.from].push({ id: parentStateId, edge: e });
-          } else {
-            visEdges.add({
-              from: parentStateId,
-              to: childStateId,
-              label: ':hasPart',
-              color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
-              width: e.isActive ? 2 : 1
-            });
-          }
-        });
-
-        if (currentMode === 'LPG') {
-          Object.keys(parentStates).forEach(parentId => {
-            const list = parentStates[parentId];
-            for (let i = 0; i < list.length - 1; i++) {
-              visEdges.add({
-                from: list[i].id,
-                to: list[i+1].id,
-                label: `TRANSITION_TO\n{at: T${list[i+1].edge.valid_from}}`,
-                color: { color: '#f59e0b' },
-                width: 2
-              });
-            }
-          });
-        }
-      }
-    }
-
-    function generateMermaidDef(visibleEdges) {
-      let def = 'flowchart TD\n';
-      def += '  classDef bfoSys fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
-      def += '  classDef bfoElem fill:#64748b,stroke:#475569,color:#ffffff,stroke-width:1px\n';
-      def += '  classDef iso4d fill:#4f46e5,stroke:#3730a3,color:#ffffff,stroke-width:2px\n';
-      def += '  classDef isoState fill:#0d9488,stroke:#0f766e,color:#ffffff,stroke-width:1px\n';
-      def += '  classDef rdfStmt fill:#f59e0b,stroke:#d97706,color:#000000,stroke-width:1px\n';
-      def += '  classDef rdfLit fill:#f1f5f9,stroke:#cbd5e1,color:#334155,stroke-dasharray:3 3\n\n';
-
-      if (currentOntology === 'BFO') {
-        if (currentMode === 'LPG') {
-          baseNodes.forEach(n => {
-            const sId = safeId(n.id);
-            const cls = n.type === 'system' ? 'bfoSys' : 'bfoElem';
-            def += `  ${sId}["<b>${n.label}</b><br/>bfo:MaterialEntity"]:::${cls}\n`;
-          });
-          visibleEdges.forEach(e => {
-            const f = safeId(e.from);
-            const t = safeId(e.to);
-            if (e.isActive) {
-              def += `  ${f} -->|"has_part: T${e.valid_from} → now"| ${t}\n`;
-            } else {
-              def += `  ${f} -.->|"has_part: T${e.valid_from} → T${e.valid_to}"| ${t}\n`;
-            }
-          });
-        } else {
-          baseNodes.forEach(n => {
-            const sId = safeId(n.id);
-            def += `  ${sId}["<b>:${n.label}</b><br/>a bfo:MaterialEntity"]:::bfoSys\n`;
-          });
-          visibleEdges.forEach(e => {
-            const stmtId = `stmt_${safeId(e.id)}`;
-            const f = safeId(e.from);
-            const t = safeId(e.to);
-            const lFrom = `lit_from_${safeId(e.id)}`;
-            const lTo = `lit_to_${safeId(e.id)}`;
-
-            def += `  ${stmtId}{{"<b>_:${e.id}</b><br/>a :TemporalPartMembership"}}:::rdfStmt\n`;
-            def += `  ${stmtId} -->|:hasParent| ${f}\n`;
-            def += `  ${stmtId} -->|:hasChild| ${t}\n`;
-            def += `  ${lFrom}(["T${e.valid_from} (xsd:int)"]):::rdfLit\n`;
-            def += `  ${stmtId} -->|:validFrom| ${lFrom}\n`;
-            if (e.valid_to !== null) {
-              def += `  ${lTo}(["T${e.valid_to} (xsd:int)"]):::rdfLit\n`;
-              def += `  ${stmtId} -.->|:validTo| ${lTo}\n`;
-            }
-          });
-        }
-      } else {
-        // ISO 15926
-        baseNodes.forEach(n => {
-          const wId = `whole_${safeId(n.id)}`;
-          def += `  ${wId}["<b>${n.label}_4D</b><br/>iso:ActualIndividual"]:::iso4d\n`;
-        });
-
-        const parentStates = {};
-
-        visibleEdges.forEach(e => {
-          const pState = `st_${safeId(e.from)}_${safeId(e.id)}`;
-          const cState = `st_${safeId(e.to)}_${safeId(e.id)}`;
-          const pWhole = `whole_${safeId(e.from)}`;
-          const cWhole = `whole_${safeId(e.to)}`;
-          const span = e.isActive ? `T${e.valid_from} → now` : `T${e.valid_from} → T${e.valid_to}`;
-
-          def += `  ${pState}["${e.from}_State<br/>${span}"]:::isoState\n`;
-          def += `  ${cState}["${e.to}_State<br/>${span}"]:::isoState\n`;
-
-          def += `  ${pState} -.->|temporalPartOf| ${pWhole}\n`;
-          def += `  ${cState} -.->|temporalPartOf| ${cWhole}\n`;
-
-          if (currentMode === 'LPG') {
-            def += `  ${pState} -->|"COMPOSED_OF [qty:1]"| ${cState}\n`;
-            if (!parentStates[e.from]) parentStates[e.from] = [];
-            parentStates[e.from].push({ id: pState, edge: e });
-          } else {
-            def += `  ${pState} -->|:hasPart| ${cState}\n`;
-          }
-        });
-
-        if (currentMode === 'LPG') {
-          Object.keys(parentStates).forEach(parentId => {
-            const list = parentStates[parentId];
-            for (let i = 0; i < list.length - 1; i++) {
-              def += `  ${list[i].id} ==>|"TRANSITION_TO (at: T${list[i+1].edge.valid_from})"| ${list[i+1].id}\n`;
-            }
-          });
-        }
-      }
-
-      return def;
-    }
-
-    async function executeMermaidRender(chartDefinition) {
-      if (isRenderingMermaid) {
-        pendingMermaidDef = chartDefinition;
-        return;
-      }
-      isRenderingMermaid = true;
-      const container = document.getElementById('mermaid-container');
-
-      try {
-        const renderId = 'mermaid_svg_' + (++mermaidCounter);
-        const { svg } = await mermaid.render(renderId, chartDefinition);
-        container.innerHTML = svg;
-      } catch (err) {
-        console.error("Mermaid Render Error:", err);
-      } finally {
-        isRenderingMermaid = false;
-        if (pendingMermaidDef) {
-          const next = pendingMermaidDef;
-          pendingMermaidDef = null;
-          executeMermaidRender(next);
-        }
-      }
-    }
-
-    function updateLegend() {
-      const leg = i18n[currentLang].legend;
-      const container = document.getElementById('graph-legend');
-      const headerTag = `${currentOntology} + ${currentMode}`;
-
-      if (currentOntology === 'BFO') {
-        if (currentMode === 'LPG') {
-          container.innerHTML = `
-            <div class="legend-title"><span>${leg.title}</span> <span style="color:#0284c7;">${headerTag}</span></div>
-            <div class="legend-section">
-              <div class="legend-section-title">${leg.nodes}</div>
-              <div class="legend-item"><span class="swatch-box-sys"></span>${leg.bfoSys}</div>
-              <div class="legend-item"><span class="swatch-box-elem"></span>${leg.bfoElem}</div>
-            </div>
-            <div class="legend-section">
-              <div class="legend-section-title">${leg.edges}</div>
-              <div class="legend-item"><span class="swatch-line-active"></span>${leg.bfoActiveEdge}</div>
-              <div class="legend-item"><span class="swatch-line-past"></span>${leg.bfoPastEdge}</div>
-            </div>
-          `;
-        } else {
-          container.innerHTML = `
-            <div class="legend-title"><span>${leg.title}</span> <span style="color:#0284c7;">${headerTag}</span></div>
-            <div class="legend-section">
-              <div class="legend-section-title">${leg.nodes}</div>
-              <div class="legend-item"><span class="swatch-box-sys"></span>${leg.bfoSys}</div>
-              <div class="legend-item"><span class="swatch-diamond"></span>${leg.rdfStmt}</div>
-              <div class="legend-item"><span class="swatch-literal"></span>${leg.rdfLit}</div>
-            </div>
-            <div class="legend-section">
-              <div class="legend-section-title">${leg.edges}</div>
-              <div class="legend-item"><span class="swatch-line-pred"></span>${leg.rdfPred} (:hasParent, :validFrom)</div>
-            </div>
-          `;
-        }
-      } else {
-        // ISO 15926
-        const extraLpgEdge = (currentMode === 'LPG') 
-          ? `<div class="legend-item"><span class="swatch-line-transition"></span>${leg.isoTransitionRel}</div>`
-          : '';
-
-        container.innerHTML = `
-          <div class="legend-title"><span>${leg.title}</span> <span style="color:#4f46e5;">${headerTag}</span></div>
-          <div class="legend-section">
-            <div class="legend-section-title">${leg.nodes}</div>
-            <div class="legend-item"><span class="swatch-box-4d"></span>${leg.iso4d}</div>
-            <div class="legend-item"><span class="swatch-box-state"></span>${leg.isoState}</div>
-          </div>
-          <div class="legend-section">
-            <div class="legend-section-title">${leg.edges}</div>
-            <div class="legend-item"><span class="swatch-line-active"></span>${leg.isoPartRel}</div>
-            <div class="legend-item"><span class="swatch-line-past"></span>${leg.isoSliceRel}</div>
-            ${extraLpgEdge}
-          </div>
-        `;
-      }
-    }
-
-    function render() {
-      const t = i18n[currentLang];
-      const showHistory = document.getElementById('history-toggle').checked;
-
-      const activeEdges = [];
-      const visibleEdges = [];
-      edgesStore.forEach(edge => {
-        const isActive = (edge.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
-        const isPast = edge.valid_to !== null && edge.valid_to <= currentTime;
-        if (isActive) activeEdges.push(edge);
-        if (isActive || (isPast && showHistory)) visibleEdges.push({ ...edge, isActive });
-      });
-
-      if (currentEngine === 'vis') {
-        renderVisData(visibleEdges);
-      } else {
-        executeMermaidRender(generateMermaidDef(visibleEdges));
-      }
-
-      updateLegend();
-
-      // URMSM BOM View
-      const treeContainer = document.getElementById('tree-container');
-      treeContainer.innerHTML = `<strong>${ROOT_ID}</strong>` + buildTreeHTML(ROOT_ID, activeEdges);
-
-      // Контролы
-      const parentSelect = document.getElementById('parent-select');
-      const removeSelect = document.getElementById('remove-select');
-      parentSelect.innerHTML = '';
-      removeSelect.innerHTML = '';
-
-      const activeNodes = new Set([ROOT_ID]);
-      activeEdges.forEach(e => { activeNodes.add(e.from); activeNodes.add(e.to); });
-      activeNodes.forEach(id => {
-        const opt = document.createElement('option');
-        opt.value = id; opt.innerText = id;
-        parentSelect.appendChild(opt);
-      });
-
-      activeEdges.forEach(e => {
-        const opt = document.createElement('option');
-        opt.value = e.id;
-        opt.innerText = `${e.from} → ${e.to}`;
-        removeSelect.appendChild(opt);
-      });
-
-      // Storage Panel (SMS)
-      const storageTag = document.getElementById('storage-paradigm-tag');
-      const storageContent = document.getElementById('storage-content');
-      storageTag.innerText = `SMS / ${currentOntology} / ${currentMode}`;
-
-      if (currentOntology === 'BFO') {
-        if (currentMode === 'LPG') {
-          let html = `<table><thead><tr><th>${t.sourceCol}</th><th>${t.targetCol}</th><th>valid_from</th><th>valid_to</th><th>${t.statusCol}</th></tr></thead><tbody>`;
-          edgesStore.forEach(edge => {
-            const isActive = (edge.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
-            html += `<tr class="${isActive ? 'active-row' : 'closed-row'}">
-              <td>${edge.from}</td><td><strong>${edge.to}</strong></td>
-              <td>T${edge.valid_from}</td><td>${edge.valid_to !== null ? 'T' + edge.valid_to : '—'}</td>
-              <td>${isActive ? t.activeStatus : t.closedStatus}</td>
-            </tr>`;
-          });
-          html += '</tbody></table>';
-          storageContent.innerHTML = html;
-        } else {
-          let ttl = `# BFO 3D in SMS: RDF Turtle with Reification\n`;
-          edgesStore.forEach(e => {
-            const isActive = (e.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
-            if (!isActive && !showHistory) return;
-            ttl += `\n_:${e.id} a :TemporalPartMembership ;\n`;
-            ttl += `    :hasParent :${e.from} ;\n`;
-            ttl += `    :hasChild  :${e.to} ;\n`;
-            ttl += `    :validFrom "${e.valid_from}"^^xsd:integer ${e.valid_to !== null ? ';\n    :validTo   "' + e.valid_to + '"^^xsd:integer .' : ' .'}\n`;
-          });
-          storageContent.innerHTML = `<pre class="code-block">${ttl}</pre>`;
-        }
-      } else {
-        // ISO 15926
-        if (currentMode === 'LPG') {
-          let html = `<table><thead><tr><th>Parent Slice</th><th>Child Slice</th><th>LPG Rel Properties</th><th>4D Extent</th></tr></thead><tbody>`;
-          visibleEdges.forEach(e => {
-            const span = e.isActive ? `[T${e.valid_from}..now]` : `[T${e.valid_from}..T${e.valid_to}]`;
-            html += `<tr class="${e.isActive ? 'active-row' : 'closed-row'}">
-              <td>${e.from}_State</td><td><strong>${e.to}_State</strong></td>
-              <td><code>{qty: 1, rev: '${e.id}', span: '${span}'}</code></td>
-              <td>${e.from}_4D, ${e.to}_4D</td>
-            </tr>`;
-          });
-          html += '</tbody></table>';
-          storageContent.innerHTML = html;
-        } else {
-          let ttl = `# ISO 15926-2 in SMS: Pure Binary RDF Triples (Tenseless Composition)\n`;
-          visibleEdges.forEach(e => {
-            const pState = `:${e.from}_state_${e.id}`;
-            const cState = `:${e.to}_state_${e.id}`;
-            ttl += `\n:${e.from}_4D a iso:ActualIndividual .\n`;
-            ttl += `:${e.to}_4D   a iso:ActualIndividual .\n`;
-            ttl += `${pState} a iso:State ;\n    iso:temporalPartOf :${e.from}_4D ;\n    iso:hasPart ${cState} .\n`;
-            ttl += `${cState} a iso:State ;\n    iso:temporalPartOf :${e.to}_4D .\n`;
-          });
-          storageContent.innerHTML = `<pre class="code-block">${ttl}</pre>`;
-        }
-      }
-    }
-
-    addPart(ROOT_ID, 'SubAssembly_1', true);
-    addPart(ROOT_ID, 'Part_A', true);
-    addPart('SubAssembly_1', 'Sensor_X', true);
-
-    setLanguage('sv');
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
