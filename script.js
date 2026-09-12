@@ -107,10 +107,21 @@ function getVisOptions() {
   return {
     physics: {
       stabilization: { iterations: 120 },
-      barnesHut: { gravitationalConstant: isComplex ? -24000 : -10000, centralGravity: 0.25, springLength: isComplex ? 220 : 150, springConstant: 0.04, damping: 0.09, avoidOverlap: 1 }
+      barnesHut: { 
+        gravitationalConstant: isComplex ? -24000 : -10000, 
+        centralGravity: 0.25, 
+        springLength: isComplex ? 220 : 150, 
+        springConstant: 0.04, 
+        damping: 0.09, 
+        avoidOverlap: 1 
+      }
     },
     nodes: { shape: 'box', margin: 10, font: { size: 12, face: 'system-ui' }, borderWidth: 1.5 },
-    edges: { arrows: 'to', smooth: { type: 'continuous', roundness: 0.2 }, font: { size: 10, align: 'middle', background: '#ffffff', strokeWidth: 0 } }
+    edges: { 
+      arrows: 'to', 
+      smooth: { type: 'continuous', roundness: 0.2 }, 
+      font: { size: 10, align: 'middle', background: '#ffffff', strokeWidth: 0 } 
+    }
   };
 }
 
@@ -182,7 +193,6 @@ function setEngine(engine) {
   render();
 }
 
-// Export/Import JSON logic
 function exportData() {
   const data = { baseNodes, edgesStore, currentTime, edgeSeq };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -263,52 +273,88 @@ function buildTreeHTML(nodeId, activeEdges) {
 }
 
 function renderVisData(visibleEdges) {
-  visNodes.clear(); visEdges.clear();
+  visNodes.clear(); 
+  visEdges.clear();
 
   if (currentOntology === 'BFO') {
-        if (currentMode === 'LPG') {
-          baseNodes.forEach(n => {
-            visNodes.add({
-              id: n.id,
-              label: `${n.label}\n(:bfo:MaterialEntity)`,
-              color: n.type === 'system' ? '#0284c7' : '#64748b',
-              font: { color: '#ffffff', bold: n.type === 'system' }
-            });
+    if (currentMode === 'LPG') {
+      baseNodes.forEach(n => {
+        visNodes.add({
+          id: n.id,
+          label: `${n.label}\n(:bfo:MaterialEntity)`,
+          color: n.type === 'system' ? '#0284c7' : '#64748b',
+          font: { color: '#ffffff', bold: n.type === 'system' }
+        });
+      });
+
+      // Группируем ребра по направленной паре (from -> to) для веерного расхождения
+      const pairMap = {};
+      visibleEdges.forEach(e => {
+        const pairKey = `${e.from}->${e.to}`;
+        if (!pairMap[pairKey]) pairMap[pairKey] = [];
+        pairMap[pairKey].push(e);
+      });
+
+      Object.values(pairMap).forEach(edgesGroup => {
+        edgesGroup.sort((a, b) => a.valid_from - b.valid_from);
+        const count = edgesGroup.length;
+        edgesGroup.forEach((e, idx) => {
+          const smoothConfig = count === 1 
+            ? { type: 'continuous', roundness: 0.2 }
+            : { type: 'curvedCW', roundness: Math.min(0.14 + (idx * 0.14), 0.85) };
+
+          visEdges.add({
+            id: e.id,
+            from: e.from,
+            to: e.to,
+            label: e.isActive ? `has_part: [T${e.valid_from}..now]` : `has_part: [T${e.valid_from}..T${e.valid_to}]`,
+            color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
+            dashes: !e.isActive,
+            width: e.isActive ? 2 : 1,
+            smooth: smoothConfig
           });
-
-          // Группируем ребра по направленной паре узлов (from -> to)
-          const pairMap = {};
-          visibleEdges.forEach(e => {
-            const pairKey = `${e.from}->${e.to}`;
-            if (!pairMap[pairKey]) pairMap[pairKey] = [];
-            pairMap[pairKey].push(e);
-          });
-
-          Object.values(pairMap).forEach(edgesGroup => {
-            // Сортируем по времени создания, чтобы дуги ложились хронологическими слоями
-            edgesGroup.sort((a, b) => a.valid_from - b.valid_from);
-
-            const count = edgesGroup.length;
-            edgesGroup.forEach((e, idx) => {
-              // Если ребро одно — стандартный пологий изгиб; если несколько — веер с шагом 0.14
-              const smoothConfig = count === 1 
-                ? { type: 'continuous', roundness: 0.2 }
-                : { type: 'curvedCW', roundness: Math.min(0.14 + (idx * 0.14), 0.85) };
-
-              visEdges.add({
-                id: e.id,
-                from: e.from,
-                to: e.to,
-                label: e.isActive ? `has_part: [T${e.valid_from}..now]` : `has_part: [T${e.valid_from}..T${e.valid_to}]`,
-                color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
-                dashes: !e.isActive,
-                width: e.isActive ? 2 : 1,
-                smooth: smoothConfig
-              });
-            });
-          });
-        } else {
-    baseNodes.forEach(n => { visNodes.add({ id: `4d_${n.id}`, label: `${n.label}_4D\n(iso:ActualIndividual)`, color: '#4f46e5', font: { color: '#ffffff', bold: true } }); });
+        });
+      });
+    } else {
+      // BFO + RDF (W3C Reification)
+      baseNodes.forEach(n => {
+        visNodes.add({
+          id: n.id,
+          label: `:${n.label}\na bfo:MaterialEntity`,
+          color: n.type === 'system' ? '#0284c7' : '#475569',
+          font: { color: '#ffffff' }
+        });
+      });
+      visibleEdges.forEach(e => {
+        const stmtId = `stmt_${e.id}`, litFromId = `lit_from_${e.id}`, litToId = `lit_to_${e.id}`;
+        visNodes.add({
+          id: stmtId,
+          label: `_:${e.id}\na :TemporalPartMembership`,
+          shape: 'diamond',
+          size: 26,
+          color: e.isActive ? '#f59e0b' : '#e2e8f0',
+          font: { size: 9, color: e.isActive ? '#000000' : '#64748b' }
+        });
+        visEdges.add({ from: stmtId, to: e.from, label: ':hasParent', color: '#94a3b8' });
+        visEdges.add({ from: stmtId, to: e.to, label: ':hasChild', color: '#94a3b8' });
+        visNodes.add({ id: litFromId, label: `"T${e.valid_from}"^^xsd:int`, shape: 'box', color: '#f8fafc', font: { size: 8 } });
+        visEdges.add({ from: stmtId, to: litFromId, label: ':validFrom', color: '#cbd5e1' });
+        if (e.valid_to !== null) {
+          visNodes.add({ id: litToId, label: `"T${e.valid_to}"^^xsd:int`, shape: 'box', color: '#f8fafc', font: { size: 8 } });
+          visEdges.add({ from: stmtId, to: litToId, label: ':validTo', color: '#cbd5e1', dashes: true });
+        }
+      });
+    }
+  } else {
+    // ISO 15926 (4D Individuals & Temporal Slices)
+    baseNodes.forEach(n => {
+      visNodes.add({
+        id: `4d_${n.id}`,
+        label: `${n.label}_4D\n(iso:ActualIndividual)`,
+        color: '#4f46e5',
+        font: { color: '#ffffff', bold: true }
+      });
+    });
     const parentStates = {};
 
     visibleEdges.forEach(e => {
@@ -321,11 +367,23 @@ function renderVisData(visibleEdges) {
       visEdges.add({ from: childStateId, to: `4d_${e.to}`, label: 'temporalPartOf', color: '#94a3b8', dashes: true });
 
       if (currentMode === 'LPG') {
-        visEdges.add({ from: parentStateId, to: childStateId, label: `COMPOSED_OF\n{qty:1, rev:'${e.id}'}`, color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' }, width: e.isActive ? 2 : 1 });
+        visEdges.add({
+          from: parentStateId,
+          to: childStateId,
+          label: `COMPOSED_OF\n{qty:1, rev:'${e.id}'}`,
+          color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
+          width: e.isActive ? 2 : 1
+        });
         if (!parentStates[e.from]) parentStates[e.from] = [];
         parentStates[e.from].push({ id: parentStateId, edge: e });
       } else {
-        visEdges.add({ from: parentStateId, to: childStateId, label: ':hasPart', color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' }, width: e.isActive ? 2 : 1 });
+        visEdges.add({
+          from: parentStateId,
+          to: childStateId,
+          label: ':hasPart',
+          color: e.isActive ? { color: '#10b981' } : { color: '#cbd5e1' },
+          width: e.isActive ? 2 : 1
+        });
       }
     });
 
@@ -333,7 +391,13 @@ function renderVisData(visibleEdges) {
       Object.keys(parentStates).forEach(parentId => {
         const list = parentStates[parentId];
         for (let i = 0; i < list.length - 1; i++) {
-          visEdges.add({ from: list[i].id, to: list[i+1].id, label: `TRANSITION_TO\n{at: T${list[i+1].edge.valid_from}}`, color: { color: '#f59e0b' }, width: 2 });
+          visEdges.add({
+            from: list[i].id,
+            to: list[i+1].id,
+            label: `TRANSITION_TO\n{at: T${list[i+1].edge.valid_from}}`,
+            color: { color: '#f59e0b' },
+            width: 2
+          });
         }
       });
     }
@@ -451,7 +515,7 @@ function render() {
     } else {
       let ttl = `# BFO 3D in SMS: RDF Turtle with Reification\n`;
       edgesStore.forEach(e => {
-        const isActive = (e.valid_to === null || e.valid_to > currentTime) && e.valid_from <= currentTime;
+        const isActive = (e.valid_to === null || edge.valid_to > currentTime) && edge.valid_from <= currentTime;
         if (!isActive && !showHistory) return;
         ttl += `\n_:${e.id} a :TemporalPartMembership ;\n    :hasParent :${e.from} ;\n    :hasChild  :${e.to} ;\n    :validFrom "${e.valid_from}"^^xsd:integer ${e.valid_to !== null ? ';\n    :validTo   "' + e.valid_to + '"^^xsd:integer .' : ' .'}\n`;
       });
