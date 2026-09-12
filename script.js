@@ -42,7 +42,7 @@ const i18n = {
     queryTitle: "Database Query", queryDesc: "Show current structure (T = T_now)",
     tooltips: {
       urmsm: "<b>URMSM (Dimension & Aspect)</b><br/>Captures the stakeholder concern and viewpoint (ISO 42010). The engineer always sees a unified BOM snapshot at time T, decoupled from graph mechanics.",
-      smrm: "<b>SMRM (Concept Repository)</b><br/>Domain Ontology: the shared engineering lexicon (System, System Element, Physical/Functional Object). Fixed here to ISO-aligned decomposition.",
+      smrm: "<b>SMRM (Concept Repository)</b><br/>Domain Ontology: the shared engineering lexicon (System, System Element, Physical/Functional Object). Fixed here to physical decomposition.",
       smim: "<b>SMIM (Information Elements & Rules)</b><br/>Top-Level Ontology (TLO). Axiomatic rules governing time and identity: 3D Continuants (BFO) vs 4D Spatio-Temporal Extents (ISO 15926).",
       sms: "<b>SMS (Data in Tool)</b><br/>Low-level physical IT implementation: Labeled Property Graphs (Neo4j style) vs W3C RDF Triples and serialized statements."
     },
