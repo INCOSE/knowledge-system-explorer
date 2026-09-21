@@ -1,0 +1,31 @@
+# AI Coding Guidelines & Constraints
+
+## 1. The Rule of Isolation (CRITICAL)
+Never bypass the data pipeline. 
+* A TLO adapter (`js/smim/`) must NEVER directly manipulate the DOM, interact with Vue, or call rendering functions. 
+* Generators (`js/sms/` and `js/urmsm/`) must NEVER read `js/state.js` directly. 
+* Renderers (`js/renderers/`) must NOT contain domain logic.
+* If you need to pass data between these isolated layers, route it strictly through the orchestrator (`js/app.js`).
+
+## 2. Event Sourcing Constraints
+* The ONLY source of truth is the Event Log array inside `js/state.js`.
+* NEVER write code that mutates, deletes, or stores graph nodes/edges directly. 
+* To change the graph, you must append a new event object to `state.eventLog` via `js/smrm/actions.js` or modify an event's `valid_to` property to close its temporal validity.
+
+## 3. Buildless Vue Constraints
+* Do NOT attempt to create `.vue` files.
+* Do NOT attempt to run `npm install`, add a `package.json`, or introduce a build step (Vite/Webpack).
+* Write all Vue code using the Composition API (`setup()`) inside native ES6 `.js` modules.
+* Use string literals for `template: \`...\`` inside the Vue configuration object.
+
+## 4. Language & Formatting
+* Use strict ES6 `import`/`export` syntax. No global variables attached to `window` (unless interacting with CDN libraries like `vis` or `mermaid`).
+* All code comments, variable names, and documentation must be written in British English (e.g., use "serialisation", "colour", "behaviour").
+* Ensure all functions have JSDoc comments explaining their purpose and parameters.
+
+## 5. Expanding the Project
+When instructed to add a new Ontology (to `smim/`), Storage engine (to `sms/`), or Viewpoint (to `urmsm/`):
+1. Create the isolated `.js` file using ES6 modules.
+2. Ensure it follows the `SemanticGraph` data contract.
+3. Wire the new module into `js/app.js`.
+4. Update `ARCHITECTURE.md` to reflect the new file.

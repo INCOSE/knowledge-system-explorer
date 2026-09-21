@@ -1,0 +1,11 @@
+---
+title: OntologiesandGraphs
+emoji: 🚀
+colorFrom: blue
+colorTo: red
+sdk: static
+pinned: false
+short_description: Sandbox for different ontologies and graphs
+---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
