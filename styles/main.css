@@ -1,0 +1,86 @@
+* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { margin: 0; padding: 12px; background: #f8fafc; color: #0f172a; display: flex; flex-direction: column; height: 100vh; }
+
+.control-deck { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.deck-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 14px; }
+.deck-row-top { background: #f1f5f9; border-bottom: 1px solid #e2e8f0; border-top-left-radius: 7px; border-top-right-radius: 7px; }
+
+.badge { background: #0284c7; color: #ffffff; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
+.section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; display: flex; align-items: center; gap: 4px; }
+
+.iec-badge { display: inline-flex; align-items: center; gap: 3px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; cursor: help; position: relative; }
+.iec-badge:hover .iec-tooltip { visibility: visible; opacity: 1; }
+.iec-tooltip { visibility: hidden; opacity: 0; position: absolute; top: 130%; left: 0; z-index: 100; background: #0f172a; color: #f8fafc; padding: 8px 12px; border-radius: 6px; font-size: 11px; font-weight: 400; line-height: 1.35; min-width: 250px; max-width: 320px; box-shadow: 0 4px 14px rgba(0,0,0,0.2); transition: opacity 0.15s ease-in-out; pointer-events: none; }
+.iec-tooltip::after { content: ""; position: absolute; bottom: 100%; left: 14px; border-width: 5px; border-style: solid; border-color: transparent transparent #0f172a transparent; }
+
+/* Правка тултипа для элементов у правого края */
+.iec-badge.align-right .iec-tooltip { left: auto; right: -5px; }
+.iec-badge.align-right .iec-tooltip::after { left: auto; right: 20px; }
+
+button { background: #0f172a; color: #ffffff; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+button:hover { background: #334155; }
+button.secondary { background: #e2e8f0; color: #0f172a; }
+button.secondary:hover { background: #cbd5e1; }
+button.danger { background: #ef4444; }
+button.danger:hover { background: #dc2626; }
+
+.btn-group { display: flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; background: #ffffff; }
+.btn-group button { border-radius: 0; background: #ffffff; color: #475569; padding: 4px 10px; border-right: 1px solid #cbd5e1; font-size: 12px; font-weight: 600; line-height: 1.2; }
+.btn-group button:last-child { border-right: none; }
+.btn-group button.active { background: #0284c7; color: #ffffff; }
+.btn-group.flag-group button { font-size: 15px; padding: 3px 8px; }
+
+input, select { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+.divider { height: 18px; width: 1px; background: #cbd5e1; margin: 0 4px; }
+
+.main-container { display: flex; flex: 1; gap: 10px; min-height: 0; }
+#canvas-container { flex: 2; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; position: relative; overflow: hidden; min-width: 20%; }
+#vis-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+#mermaid-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: auto; padding: 24px 24px 140px 24px; display: flex; justify-content: center; align-items: flex-start; background: #ffffff; }
+#mermaid-container svg { width: auto; height: auto; max-width: none; }
+
+/* Ресайзеры (горизонтальный и вертикальный) */
+.resizer { width: 8px; background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; cursor: col-resize; transition: background-color 0.2s, border-color 0.2s; flex-shrink: 0; }
+.resizer:hover, .resizer.dragging { background-color: #cbd5e1; border-color: #94a3b8; }
+.resizer-h { height: 8px; background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; cursor: row-resize; transition: background-color 0.2s, border-color 0.2s; flex-shrink: 0; }
+.resizer-h:hover, .resizer-h.dragging { background-color: #cbd5e1; border-color: #94a3b8; }
+body.no-select { user-select: none; }
+
+.graph-legend { position: absolute; bottom: 12px; left: 12px; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(4px); border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); font-size: 11px; color: #334155; z-index: 20; max-width: 330px; }
+.legend-title { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 6px; display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+.legend-section { margin-top: 5px; }
+.legend-section-title { font-weight: 600; color: #64748b; font-size: 10px; margin-bottom: 3px; text-transform: uppercase; }
+.legend-item { display: flex; align-items: center; margin-bottom: 3px; line-height: 1.25; }
+
+.swatch-box-sys { width: 13px; height: 11px; background: #0284c7; border: 1px solid #0369a1; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+.swatch-box-elem { width: 13px; height: 11px; background: #64748b; border: 1px solid #475569; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+.swatch-box-4d { width: 13px; height: 11px; background: #4f46e5; border: 1px solid #3730a3; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+.swatch-box-state { width: 13px; height: 11px; background: #0d9488; border: 1px solid #0f766e; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+.swatch-diamond { width: 9px; height: 9px; background: #f59e0b; border: 1px solid #d97706; transform: rotate(45deg); margin: 0 10px 0 2px; flex-shrink: 0; }
+.swatch-literal { width: 14px; height: 9px; background: #f1f5f9; border: 1px dashed #94a3b8; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+.swatch-line-active { width: 16px; height: 2px; background: #10b981; margin-right: 8px; flex-shrink: 0; }
+.swatch-line-past { width: 16px; height: 0; border-top: 2px dashed #94a3b8; margin-right: 8px; flex-shrink: 0; }
+.swatch-line-transition { width: 16px; height: 2px; background: #f59e0b; margin-right: 8px; flex-shrink: 0; }
+
+.sidebar { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 350px; }
+.card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; }
+.card h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; display: flex; justify-content: space-between; align-items: center; }
+ul.tree, ul.tree ul { list-style-type: none; padding-left: 16px; margin: 4px 0; }
+ul.tree li { position: relative; padding: 2px 0; font-size: 13px; }
+ul.tree li::before { content: "├─ "; color: #94a3b8; }
+ul.tree li:last-child::before { content: "└─ "; color: #94a3b8; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
+th { color: #64748b; font-weight: 600; }
+.active-row { background: #f0fdf4; }
+.closed-row { color: #94a3b8; text-decoration: line-through; }
+pre.code-block { margin: 0; font-family: monospace; font-size: 11px; color: #334155; line-height: 1.4; background: #f8fafc; padding: 8px; border-radius: 4px; border: 1px solid #e2e8f0; overflow-y: auto; flex: 1; }
+
+/* Fix for Vue #app wrapper to fill the viewport */
+#app {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+}
