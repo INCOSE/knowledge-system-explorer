@@ -3,38 +3,25 @@ import { reactive } from 'vue';
 /**
  * SINGLE SOURCE OF TRUTH (Event Sourcing)
  * ---------------------------------------
- * This module holds the entire reactive state of the application.
- * According to the architecture guidelines, we NEVER mutate or store
- * visual graph nodes (like Vis.js or Mermaid configurations) here.
+ * This module holds the pure domain reactive state of the application.
+ * According to architecture guidelines, UI settings and visual graph
+ * configurations are never stored here.
  * 
- * We only store the absolute truth: Settings, Current Time, 
- * the known Entities (Nodes), and the Event Log (Relationships over time).
+ * We only store the absolute domain truth:
+ * - Current Time dimension
+ * - Event Log (temporal relationships over time)
+ * - Edge sequence counter
  */
 export const state = reactive({
-  // 1. Application Settings (UI & TLO/DB selection)
-  settings: {
-    language: 'sv',         // Available options: 'sv', 'en', 'ru'
-    ontology: 'BFO',        // SMIM Top-Level Ontology: 'BFO' or 'ISO15926'
-    storage: 'LPG',         // SMS Storage Paradigm: 'LPG' or 'RDF'
-    engine: 'vis'           // Renderer: 'vis' (Vis.js) or 'mermaid'
-  },
-
-  // 2. Global Time Dimension
+  // 1. Global Time Dimension
   currentTime: 0,
 
-  // 3. Concept Repository (SMRM) - Base Entities
-  // This stores the static identifiers of our system elements.
-  nodes: [
-    { id: 'System_A', label: 'System_A', type: 'system' }
-  ],
-
-  // 4. The Event Log (The core of our Event Sourcing)
-  // Instead of modifying a graph directly, we log temporal events.
+  // 2. The Event Log (The core of our Event Sourcing)
   // Format: { id: 'e1', from: 'Parent', to: 'Child', valid_from: 0, valid_to: null }
   // A 'null' valid_to indicates the relationship is currently active.
   eventLog: [],
 
-  // Counter to ensure unique IDs for our events/edges
+  // 3. Counter to ensure unique IDs for our events/edges
   edgeSequence: 1
 });
 
@@ -47,23 +34,14 @@ export function advanceTime() {
 }
 
 /**
- * Completely replaces the current state.
- * Useful for loading a saved JSON file or injecting a predefined Scenario (Edge Case).
+ * Completely replaces the current domain state.
+ * Useful for loading a saved JSON file or injecting a predefined Scenario.
  * 
  * @param {Object} newState - The data object containing the state to inject.
  */
 export function loadState(newState) {
-  if (newState.settings) {
-    Object.assign(state.settings, newState.settings);
-  }
-  
   if (newState.currentTime !== undefined) {
     state.currentTime = newState.currentTime;
-  }
-  
-  if (newState.nodes) {
-    // Empty the array and push new items to maintain Vue reactivity
-    state.nodes.splice(0, state.nodes.length, ...newState.nodes);
   }
   
   if (newState.eventLog) {

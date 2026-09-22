@@ -1,81 +1,98 @@
-import { state } from '../state.js';
-
 /**
- * DOMAIN ACTIONS (SMRM Layer)
- * ---------------------------
- * This module is responsible for validating business logic and user actions
- * before generating Events and appending them to the Event Log in state.js.
+ * DOMAIN ACTION FACTORIES (SMRM Layer)
+ * ------------------------------------
+ * This module contains pure factory functions responsible for validating
+ * business rules and creating immutable Event objects.
  * 
- * Strict Rule: No UI logic here. Only data mutation rules.
+ * Strict Architectural Rule:
+ * Functions here MUST NOT import the singleton state or directly mutate data.
+ * All functions are pure factories returning event descriptors to be dispatched.
  */
 
 /**
- * Adds a new component (Part) to a Parent element.
+ * Creates an event representing the addition of a new part to a parent component.
+ * Pure factory function - does not mutate any external state.
  * 
- * @param {string} parentId - The ID of the parent node.
- * @param {string} partName - The raw string name of the new part.
+ * @param {string} parentId - The unique identifier of the parent node.
+ * @param {string} partName - The raw string name/identifier of the new part.
+ * @param {number} [currentTime=0] - The current system timestamp.
+ * @param {number|string|null} [edgeSequence=null] - Optional sequence number or ID for the relationship.
+ * @param {Array} [existingEvents=[]] - Optional list of existing events to validate uniqueness.
+ * @returns {Object|null} The created relationship event object, or null if validation fails.
  */
-export function addPart(parentId, partName) {
-  if (!partName || !parentId) return;
+export function createAddPartEvent(parentId, partName, currentTime = 0, edgeSequence = null, existingEvents = []) {
+  if (!parentId || !partName) return null;
   
-  const partId = partName.trim();
+  const trimmedParent = String(parentId).trim();
+  const trimmedPart = String(partName).trim();
   
-  // Rule 1: Cannot be parent to itself
-  if (parentId === partId) return;
+  // Rule 1: A node cannot be a parent to itself
+  if (!trimmedParent || !trimmedPart || trimmedParent === trimmedPart) {
+    return null;
+  }
 
   // Rule 2: Prevent duplicating an active edge between the same parent and child
-  const edgeExists = state.eventLog.some(e => 
-    e.from === parentId && 
-    e.to === partId && 
-    e.valid_to === null
-  );
-  
-  if (edgeExists) {
-    console.warn(`[SMRM] Active edge already exists between ${parentId} and ${partId}`);
-    return;
+  if (Array.isArray(existingEvents) && existingEvents.length > 0) {
+    const edgeExists = existingEvents.some(e => 
+      e.from === trimmedParent && 
+      e.to === trimmedPart && 
+      e.valid_to === null
+    );
+    
+    if (edgeExists) {
+      console.warn(`[SMRM] Active edge already exists between ${trimmedParent} and ${trimmedPart}`);
+      return null;
+    }
   }
 
-  // Rule 3: If the node doesn't exist in our Concept Repository, create it
-  const nodeExists = state.nodes.some(n => n.id === partId);
-  if (!nodeExists) {
-    state.nodes.push({ id: partId, label: partId, type: 'element' });
-  }
+  const eventId = edgeSequence != null 
+    ? (typeof edgeSequence === 'number' ? `e${edgeSequence}` : String(edgeSequence))
+    : null;
 
-  // Generate the Event and push to Event Log
-  const eventId = 'e' + state.edgeSequence++;
-  state.eventLog.push({
+  return {
     id: eventId,
-    from: parentId,
-    to: partId,
-    valid_from: state.currentTime,
-    valid_to: null // null means 'active until further notice'
-  });
+    from: trimmedParent,
+    to: trimmedPart,
+    valid_from: currentTime,
+    valid_to: null // null indicates the relationship is active indefinitely
+  };
 }
 
 /**
- * Removes (severs) an active relationship between a Parent and a Child.
- * In an Event Sourced system, we don't delete the edge, we "close" it
- * by setting valid_to = currentTime.
+ * Creates an event representing the severing (closing) of an active relationship.
+ * Pure factory function - does not mutate any external state.
  * 
- * @param {string} edgeId - The ID of the edge/relationship to sever.
+ * @param {string} edgeId - The unique identifier of the edge/relationship to sever.
+ * @param {number} [currentTime=0] - The timestamp at which the relationship is severed.
+ * @param {Array} [existingEvents=[]] - Optional list of existing events to validate against.
+ * @returns {Object|null} The relationship closure descriptor, or null if validation fails.
  */
-export function removeEdge(edgeId) {
-  // Find the exact event/edge
-  const edgeIndex = state.eventLog.findIndex(e => e.id === edgeId);
+export function createRemoveEdgeEvent(edgeId, currentTime = 0, existingEvents = []) {
+  if (!edgeId) return null;
   
-  if (edgeIndex === -1) {
-    console.error(`[SMRM] Cannot sever relation. Edge ${edgeId} not found.`);
-    return;
+  const strEdgeId = String(edgeId);
+
+  // Rule: Validate that the edge exists and is currently active
+  if (Array.isArray(existingEvents) && existingEvents.length > 0) {
+    const edge = existingEvents.find(e => e.id === strEdgeId);
+    if (!edge) {
+      console.error(`[SMRM] Cannot sever relation. Edge ${strEdgeId} not found.`);
+      return null;
+    }
+    if (edge.valid_to !== null) {
+      console.warn(`[SMRM] Relation ${strEdgeId} is already closed.`);
+      return null;
+    }
   }
 
-  const edge = state.eventLog[edgeIndex];
-
-  // Rule 4: We can only sever active edges
-  if (edge.valid_to !== null) {
-    console.warn(`[SMRM] Relation ${edgeId} is already closed.`);
-    return;
-  }
-
-  // Close the temporal validity of the relationship
-  edge.valid_to = state.currentTime;
+  return {
+    type: 'EDGE_REMOVED',
+    edgeId: strEdgeId,
+    valid_to: currentTime
+  };
 }
+
+// Aliases for terminology consistency and backwards compatibility
+export const createCloseEdgeEvent = createRemoveEdgeEvent;
+export const addPart = createAddPartEvent;
+export const removeEdge = createRemoveEdgeEvent;

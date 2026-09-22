@@ -9,7 +9,7 @@
 import { createApp, computed, watch, onMounted, ref, reactive } from 'vue';
 import { state, advanceTime } from './state.js';
 import { i18n } from './i18n.js';
-import { addPart, removeEdge } from './smrm/actions.js';
+import { createAddPartEvent, createRemoveEdgeEvent } from './smrm/actions.js';
 import * as bfoAdapter from './smim/bfo.js';
 import * as isoAdapter from './smim/iso15926.js';
 import { initVisNetwork, updateVisNetwork } from './renderers/vis-adapter.js';
@@ -20,6 +20,14 @@ import { generateRdfStorageHtml, generateRdfQuery } from './sms/rdf-generator.js
 
 const App = {
   setup() {
+    // 1. Local UI Settings (Isolated from domain state)
+    const settings = reactive({
+      language: 'sv',         // Available options: 'sv', 'en', 'ru'
+      ontology: 'BFO',        // SMIM Top-Level Ontology: 'BFO' or 'ISO15926'
+      storage: 'LPG',         // SMS Storage Paradigm: 'LPG' or 'RDF'
+      engine: 'vis'           // Renderer: 'vis' (Vis.js) or 'mermaid'
+    });
+
     // DOM References for renderers
     const visContainer = ref(null);
     const mermaidContainer = ref(null);
@@ -33,8 +41,8 @@ const App = {
     // Layout State (Flex percentages for resizers)
     const layout = reactive({ leftWidth: 66, bomHeight: 25, storageHeight: 40 });
 
-    // Active dictionary based on state
-    const t = computed(() => i18n[state.settings.language]);
+    // Active dictionary based on local settings
+    const t = computed(() => i18n[settings.language]);
 
     // Computed views over the Event Log
     const activeEdges = computed(() => {
@@ -46,18 +54,91 @@ const App = {
 
     const activeNodes = computed(() => {
       const nodes = new Set(['System_A']);
-      activeEdges.value.forEach(e => { nodes.add(e.from); nodes.add(e.to); });
+      activeEdges.value.forEach(e => {
+        if (e.from) nodes.add(e.from);
+        if (e.to) nodes.add(e.to);
+      });
       return Array.from(nodes);
     });
+
+    // Dynamic entity projection: Reconstruct base entities from the event log
+    const baseNodes = computed(() => {
+      const nodeMap = new Map();
+      // Root continuant system entity
+      nodeMap.set('System_A', { id: 'System_A', label: 'System_A', type: 'system' });
+
+      const events = showHistory.value ? state.eventLog : activeEdges.value;
+      events.forEach(event => {
+        if (event.from && !nodeMap.has(event.from)) {
+          nodeMap.set(event.from, { id: event.from, label: event.from, type: 'element' });
+        }
+        if (event.to && !nodeMap.has(event.to)) {
+          nodeMap.set(event.to, { id: event.to, label: event.to, type: 'element' });
+        }
+      });
+
+      return Array.from(nodeMap.values());
+    });
+
+    /**
+     * Central Event Dispatcher
+     * ------------------------
+     * Receives domain action events, validates consistency, and mutates
+     * the event log strictly according to Event Sourcing principles.
+     * 
+     * @param {Object} event - The domain event object to dispatch.
+     */
+    function dispatch(event) {
+      if (!event) return;
+
+      if (event.type === 'EDGE_REMOVED' || event.type === 'REMOVE_EDGE') {
+        const targetEdge = state.eventLog.find(e => e.id === event.edgeId);
+        if (!targetEdge) {
+          console.error(`[Dispatcher] Cannot sever relation. Edge ${event.edgeId} not found.`);
+          return;
+        }
+        if (targetEdge.valid_to !== null) {
+          console.warn(`[Dispatcher] Relation ${event.edgeId} is already closed.`);
+          return;
+        }
+        targetEdge.valid_to = event.valid_to ?? state.currentTime;
+        return;
+      }
+
+      // Relationship creation event
+      if (!event.id) {
+        event.id = `e${state.edgeSequence++}`;
+      } else {
+        const match = String(event.id).match(/^e(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num >= state.edgeSequence) {
+            state.edgeSequence = num + 1;
+          }
+        }
+      }
+
+      const edgeExists = state.eventLog.some(e => 
+        e.from === event.from && 
+        e.to === event.to && 
+        e.valid_to === null
+      );
+      if (edgeExists) {
+        console.warn(`[Dispatcher] Active edge already exists between ${event.from} and ${event.to}`);
+        return;
+      }
+
+      state.eventLog.push(event);
+    }
 
     // The core transformation pipeline: Event Log -> Ontology -> Semantic Graph
     const semanticGraph = computed(() => {
       const eventsToProcess = showHistory.value ? state.eventLog : activeEdges.value;
       
-      if (state.settings.ontology === 'BFO') {
-        return bfoAdapter.generateSemanticGraph(eventsToProcess, state.nodes, state.currentTime, state.settings.storage);
+      if (settings.ontology === 'BFO') {
+        return bfoAdapter.generateSemanticGraph(eventsToProcess, baseNodes.value, state.currentTime, settings.storage);
       } else {
-        return isoAdapter.generateSemanticGraph(eventsToProcess, state.nodes, state.currentTime, state.settings.storage);
+        return isoAdapter.generateSemanticGraph(eventsToProcess, baseNodes.value, state.currentTime, settings.storage);
       }
     });
 
@@ -65,29 +146,29 @@ const App = {
     const bomHtml = computed(() => generateBomHtml('System_A', activeEdges.value));
     
     const storageHtml = computed(() => {
-      if (state.settings.storage === 'LPG') {
-        return generateLpgStorageHtml(semanticGraph.value, state.settings.ontology);
+      if (settings.storage === 'LPG') {
+        return generateLpgStorageHtml(semanticGraph.value, settings.ontology);
       } else {
-        return generateRdfStorageHtml(semanticGraph.value, state.settings.ontology);
+        return generateRdfStorageHtml(semanticGraph.value, settings.ontology);
       }
     });
 
     const queryHtml = computed(() => {
-      if (state.settings.storage === 'LPG') {
-        return generateLpgQuery(state.settings.ontology, state.currentTime);
+      if (settings.storage === 'LPG') {
+        return generateLpgQuery(settings.ontology, state.currentTime);
       } else {
-        return generateRdfQuery(state.settings.ontology, state.currentTime);
+        return generateRdfQuery(settings.ontology, state.currentTime);
       }
     });
 
     // Watch for graph or engine changes to trigger re-renders
-    watch([semanticGraph, () => state.settings.engine], () => {
+    watch([semanticGraph, () => settings.engine], () => {
       renderGraph();
     }, { deep: true });
 
     function renderGraph() {
-      if (state.settings.engine === 'vis') {
-        const isComplex = state.settings.ontology === 'ISO15926' || state.settings.storage === 'RDF';
+      if (settings.engine === 'vis') {
+        const isComplex = settings.ontology === 'ISO15926' || settings.storage === 'RDF';
         updateVisNetwork(semanticGraph.value, isComplex);
       } else if (mermaidContainer.value) {
         updateMermaidNetwork(semanticGraph.value, mermaidContainer.value);
@@ -100,23 +181,39 @@ const App = {
         initVisNetwork(visContainer.value);
       }
       
-      // Inject initial seed data
-      addPart('System_A', 'SubAssembly_1');
-      addPart('System_A', 'Part_A');
-      addPart('SubAssembly_1', 'Sensor_X');
+      // Inject initial seed data via pure factories and central dispatcher
+      dispatch(createAddPartEvent('System_A', 'SubAssembly_1', state.currentTime, state.edgeSequence, state.eventLog));
+      dispatch(createAddPartEvent('System_A', 'Part_A', state.currentTime, state.edgeSequence, state.eventLog));
+      dispatch(createAddPartEvent('SubAssembly_1', 'Sensor_X', state.currentTime, state.edgeSequence, state.eventLog));
       
       renderGraph();
     });
 
     // UI Event Handlers
     function handleAdd() {
-      addPart(selectedParent.value, partNameInput.value);
-      partNameInput.value = '';
+      const event = createAddPartEvent(
+        selectedParent.value,
+        partNameInput.value,
+        state.currentTime,
+        state.edgeSequence,
+        state.eventLog
+      );
+      if (event) {
+        dispatch(event);
+        partNameInput.value = '';
+      }
     }
 
     function handleRemove() {
       if (selectedEdgeToRemove.value) {
-        removeEdge(selectedEdgeToRemove.value);
+        const event = createRemoveEdgeEvent(
+          selectedEdgeToRemove.value,
+          state.currentTime,
+          state.eventLog
+        );
+        if (event) {
+          dispatch(event);
+        }
       }
     }
 
@@ -164,7 +261,7 @@ const App = {
     }
 
     return {
-      state, t, layout, advanceTime,
+      state, settings, t, layout, advanceTime, dispatch,
       handleAdd, handleRemove,
       partNameInput, selectedParent, selectedEdgeToRemove, showHistory,
       activeNodes, activeEdges,
@@ -183,8 +280,8 @@ const App = {
           <span>{{ t.ontoTitle }}</span>
         </div>
         <div class="btn-group">
-          <button :class="{ active: state.settings.ontology === 'BFO' }" @click="state.settings.ontology = 'BFO'">BFO (3D)</button>
-          <button :class="{ active: state.settings.ontology === 'ISO15926' }" @click="state.settings.ontology = 'ISO15926'">ISO 15926 (4D)</button>
+          <button :class="{ active: settings.ontology === 'BFO' }" @click="settings.ontology = 'BFO'">BFO (3D)</button>
+          <button :class="{ active: settings.ontology === 'ISO15926' }" @click="settings.ontology = 'ISO15926'">ISO 15926 (4D)</button>
         </div>
 
         <div class="divider"></div>
@@ -194,22 +291,22 @@ const App = {
           <span>{{ t.graphTitle }}</span>
         </div>
         <div class="btn-group">
-          <button :class="{ active: state.settings.storage === 'LPG' }" @click="state.settings.storage = 'LPG'">LPG</button>
-          <button :class="{ active: state.settings.storage === 'RDF' }" @click="state.settings.storage = 'RDF'">RDF (W3C)</button>
+          <button :class="{ active: settings.storage === 'LPG' }" @click="settings.storage = 'LPG'">LPG</button>
+          <button :class="{ active: settings.storage === 'RDF' }" @click="settings.storage = 'RDF'">RDF (W3C)</button>
         </div>
 
         <div class="divider"></div>
 
         <div class="section-label">🎨 <span>{{ t.engineTitle }}</span></div>
         <div class="btn-group">
-          <button :class="{ active: state.settings.engine === 'vis' }" @click="state.settings.engine = 'vis'">🌐 Vis.js</button>
-          <button :class="{ active: state.settings.engine === 'mermaid' }" @click="state.settings.engine = 'mermaid'">📊 Mermaid</button>
+          <button :class="{ active: settings.engine === 'vis' }" @click="settings.engine = 'vis'">🌐 Vis.js</button>
+          <button :class="{ active: settings.engine === 'mermaid' }" @click="settings.engine = 'mermaid'">📊 Mermaid</button>
         </div>
 
         <div style="margin-left: auto;" class="btn-group flag-group">
-          <button :class="{ active: state.settings.language === 'sv' }" @click="state.settings.language = 'sv'" title="Svenska">🇸🇪</button>
-          <button :class="{ active: state.settings.language === 'en' }" @click="state.settings.language = 'en'" title="British English">🇬🇧</button>
-          <button :class="{ active: state.settings.language === 'ru' }" @click="state.settings.language = 'ru'" title="Русский">🇷🇺</button>
+          <button :class="{ active: settings.language === 'sv' }" @click="settings.language = 'sv'" title="Svenska">🇸🇪</button>
+          <button :class="{ active: settings.language === 'en' }" @click="settings.language = 'en'" title="British English">🇬🇧</button>
+          <button :class="{ active: settings.language === 'ru' }" @click="settings.language = 'ru'" title="Русский">🇷🇺</button>
         </div>
       </div>
 
@@ -253,8 +350,8 @@ const App = {
 
     <div class="main-container">
       <div id="canvas-container" :style="{ flex: \`0 0 \${layout.leftWidth}%\` }">
-        <div ref="visContainer" v-show="state.settings.engine === 'vis'" style="width: 100%; height: 100%; position: absolute;"></div>
-        <div ref="mermaidContainer" v-show="state.settings.engine === 'mermaid'" id="mermaid-container"></div>
+        <div ref="visContainer" v-show="settings.engine === 'vis'" style="width: 100%; height: 100%; position: absolute;"></div>
+        <div ref="mermaidContainer" v-show="settings.engine === 'mermaid'" id="mermaid-container"></div>
       </div>
       
       <!-- Horizontal Resizer -->
@@ -276,7 +373,7 @@ const App = {
         <div class="card" :style="{ flex: \`0 0 \${layout.storageHeight}%\` }">
           <h4>
             <span>{{ t.titleStorage }}</span>
-            <span style="color:#0284c7; font-weight: 600;">SMS / {{ state.settings.ontology }} / {{ state.settings.storage }}</span>
+            <span style="color:#0284c7; font-weight: 600;">SMS / {{ settings.ontology }} / {{ settings.storage }}</span>
           </h4>
           <div id="storage-content" style="overflow-y: auto; display: flex; flex-direction: column;" v-html="storageHtml"></div>
         </div>
@@ -290,7 +387,7 @@ const App = {
             <span style="font-weight: normal; text-transform: none; color: #0d9488;">{{ t.queryDesc }}</span>
           </h4>
           <div id="query-content" style="display: flex; flex-direction: column; flex: 1;">
-            <pre class="code-block" :style="{ color: state.settings.ontology === 'BFO' ? '#0369a1' : '#3730a3' }">{{ queryHtml }}</pre>
+            <pre class="code-block" :style="{ color: settings.ontology === 'BFO' ? '#0369a1' : '#3730a3' }">{{ queryHtml }}</pre>
           </div>
         </div>
       </div>
