@@ -14,57 +14,42 @@ import * as bfoAdapter from './smim/bfo.js';
 import * as isoAdapter from './smim/iso15926.js';
 import { initVisNetwork, updateVisNetwork } from './renderers/vis-adapter.js';
 import { updateMermaidNetwork } from './renderers/mermaid-adapter.js';
-import { generateBomHtml } from './urmsm/bom-view.js';
+import { generateBomTree } from './urmsm/bom-view.js';
 import { generateLpgStorage, generateLpgQuery } from './sms/lpg-generator.js';
 import { generateRdfStorage, generateRdfQuery } from './sms/rdf-generator.js';
 
 /**
- * Renders an array of LPG relationship storage records as an HTML table.
- * Applies 'active-row' and 'closed-row' classes for temporal highlighting.
- *
- * @param {Array<Object>} rows - Array of LPG relationship records.
- * @returns {string} HTML table string.
+ * RECURSIVE BOM TREE NODE COMPONENT
+ * ---------------------------------
+ * Pure Vue component for rendering hierarchical Bill of Materials nodes
+ * without raw HTML strings or external DOM manipulation.
  */
-function renderLpgTable(rows) {
-  if (!rows || rows.length === 0) {
-    return '<div style="color: #94a3b8; padding: 8px;">No relationship records</div>';
-  }
-
-  let html = '<table><thead><tr>';
-  html += '<th>Source</th><th>Target</th><th>Type</th><th>Properties</th><th>Status</th>';
-  html += '</tr></thead><tbody>';
-
-  rows.forEach(row => {
-    const rowClass = row.isActive ? 'active-row' : 'closed-row';
-    const statusText = row.isActive ? 'Active' : 'Closed';
-
-    // Format relationship properties excluding the internal isCurrent flag
-    const propEntries = Object.entries(row.properties || {})
-      .filter(([key]) => key !== 'isCurrent');
-
-    let propHtml = '—';
-    if (propEntries.length > 0) {
-      const formattedProps = propEntries.map(([k, v]) => {
-        const valStr = v === null ? 'null' : (typeof v === 'number' ? `T${v}` : `'${v}'`);
-        return `${k}: ${valStr}`;
-      }).join(', ');
-      propHtml = `<code>{ ${formattedProps} }</code>`;
+const BomNode = {
+  name: 'BomNode',
+  props: {
+    node: {
+      type: Object,
+      required: true
     }
-
-    html += `<tr class="${rowClass}">`;
-    html += `<td>${row.from}</td>`;
-    html += `<td><strong>${row.to}</strong></td>`;
-    html += `<td><code>:${row.label}</code></td>`;
-    html += `<td>${propHtml}</td>`;
-    html += `<td>${statusText}</td>`;
-    html += '</tr>';
-  });
-
-  html += '</tbody></table>';
-  return html;
-}
+  },
+  template: `
+    <li>
+      <strong>{{ node.id }}</strong>
+      <ul v-if="node.children && node.children.length > 0" class="tree">
+        <bom-node
+          v-for="child in node.children"
+          :key="child.id"
+          :node="child"
+        />
+      </ul>
+    </li>
+  `
+};
 
 const App = {
+  components: {
+    BomNode
+  },
   setup() {
     // 1. Local UI Settings (Isolated from domain state)
     const settings = reactive({
@@ -189,19 +174,33 @@ const App = {
     });
 
     // Derived Views for the Sidebar (URMSM & SMS)
-    const bomHtml = computed(() => generateBomHtml('System_A', activeEdges.value));
+    const bomTree = computed(() => generateBomTree('System_A', activeEdges.value));
     
-    const storageHtml = computed(() => {
+    const lpgRecords = computed(() => {
       if (settings.storage === 'LPG') {
-        const records = generateLpgStorage(semanticGraph.value);
-        return renderLpgTable(records);
-      } else {
-        const ttl = generateRdfStorage(semanticGraph.value);
-        return `<pre class="code-block">${ttl}</pre>`;
+        return generateLpgStorage(semanticGraph.value);
       }
+      return [];
     });
 
-    const queryHtml = computed(() => {
+    const rdfTtl = computed(() => {
+      if (settings.storage === 'RDF') {
+        return generateRdfStorage(semanticGraph.value);
+      }
+      return '';
+    });
+
+    function formatProperties(props) {
+      if (!props) return '';
+      const entries = Object.entries(props).filter(([key]) => key !== 'isCurrent');
+      if (entries.length === 0) return '';
+      return entries.map(([k, v]) => {
+        const valStr = v === null ? 'null' : (typeof v === 'number' ? `T${v}` : `'${v}'`);
+        return `${k}: ${valStr}`;
+      }).join(', ');
+    }
+
+    const queryCode = computed(() => {
       if (settings.storage === 'LPG') {
         return generateLpgQuery(semanticGraph.value, state.currentTime);
       } else {
@@ -216,7 +215,7 @@ const App = {
 
     function renderGraph() {
       if (settings.engine === 'vis') {
-        const isComplex = settings.ontology === 'ISO15926' || settings.storage === 'RDF';
+        const isComplex = settings.ontology === 'ISO15926';
         updateVisNetwork(semanticGraph.value, isComplex);
       } else if (mermaidContainer.value) {
         updateMermaidNetwork(semanticGraph.value, mermaidContainer.value);
@@ -313,7 +312,7 @@ const App = {
       handleAdd, handleRemove,
       partNameInput, selectedParent, selectedEdgeToRemove, showHistory,
       activeNodes, activeEdges,
-      bomHtml, storageHtml, queryHtml,
+      bomTree, lpgRecords, rdfTtl, formatProperties, queryCode,
       visContainer, mermaidContainer,
       startResizeH, startResizeV
     };
@@ -412,7 +411,14 @@ const App = {
             <span>{{ t.titleBom }}</span>
             <span class="iec-badge align-right">IEC 63339 / URMSM<span class="iec-tooltip" v-html="t.tooltips.urmsm"></span></span>
           </h4>
-          <div id="tree-container" style="overflow-y: auto;" v-html="bomHtml"></div>
+          <div id="tree-container" style="overflow-y: auto;">
+            <template v-if="bomTree">
+              <strong>{{ bomTree.id }}</strong>
+              <ul v-if="bomTree.children && bomTree.children.length > 0" class="tree">
+                <bom-node v-for="child in bomTree.children" :key="child.id" :node="child" />
+              </ul>
+            </template>
+          </div>
         </div>
 
         <div class="resizer-h" @mousedown="(e) => startResizeV(e, 'bomHeight', '.sidebar')"></div>
@@ -423,7 +429,35 @@ const App = {
             <span>{{ t.titleStorage }}</span>
             <span style="color:#0284c7; font-weight: 600;">SMS / {{ settings.ontology }} / {{ settings.storage }}</span>
           </h4>
-          <div id="storage-content" style="overflow-y: auto; display: flex; flex-direction: column;" v-html="storageHtml"></div>
+          <div id="storage-content" style="overflow-y: auto; display: flex; flex-direction: column;">
+            <table v-if="settings.storage === 'LPG' && lpgRecords.length > 0">
+              <thead>
+                <tr>
+                  <th>{{ t.sourceCol }}</th>
+                  <th>{{ t.targetCol }}</th>
+                  <th>Type</th>
+                  <th>Properties</th>
+                  <th>{{ t.statusCol }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in lpgRecords" :key="row.id" :class="row.isActive ? 'active-row' : 'closed-row'">
+                  <td>{{ row.from }}</td>
+                  <td><strong>{{ row.to }}</strong></td>
+                  <td><code>:{{ row.label }}</code></td>
+                  <td>
+                    <code v-if="formatProperties(row.properties)">{ {{ formatProperties(row.properties) }} }</code>
+                    <span v-else>—</span>
+                  </td>
+                  <td>{{ row.isActive ? t.activeStatus : t.closedStatus }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else-if="settings.storage === 'LPG'" style="color: #94a3b8; padding: 8px;">
+              No relationship records
+            </div>
+            <pre v-else class="code-block">{{ rdfTtl }}</pre>
+          </div>
         </div>
 
         <div class="resizer-h" @mousedown="(e) => startResizeV(e, 'storageHeight', '.sidebar')"></div>
@@ -435,7 +469,7 @@ const App = {
             <span style="font-weight: normal; text-transform: none; color: #0d9488;">{{ t.queryDesc }}</span>
           </h4>
           <div id="query-content" style="display: flex; flex-direction: column; flex: 1;">
-            <pre class="code-block" :style="{ color: settings.ontology === 'BFO' ? '#0369a1' : '#3730a3' }">{{ queryHtml }}</pre>
+            <pre class="code-block" :style="{ color: settings.ontology === 'BFO' ? '#0369a1' : '#3730a3' }">{{ queryCode }}</pre>
           </div>
         </div>
       </div>

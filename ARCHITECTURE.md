@@ -30,7 +30,7 @@ This is a **Buildless Vue 3** application using native ES6 modules.
 All `smim/` adapters must return an object in this format to decouple ontologies from renderers:
 \`\`\`javascript
 {
-  nodes: [ { id: "part_1_state_2", label: "Part 1 [T2..]", type: "State", data: { isActive: true } } ],
-  edges: [ { id: "e1", from: "parent_state", to: "child_state", label: "hasPart", type: "composition", data: {} } ]
+  nodes: [ { id: "st_Part_1_e1", label: "Part_1_State", type: "State", properties: { isCurrent: true } } ],
+  edges: [ { id: "e1", from: "st_System_A_e1", to: "st_Part_1_e1", label: "hasPart", type: "composition", properties: { validFrom: 0, validTo: null, isCurrent: true } } ]
 }
 \`\`\`

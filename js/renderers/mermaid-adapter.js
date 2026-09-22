@@ -68,6 +68,10 @@ async function executePendingRender(definition, container) {
 
 /**
  * Builds the string definition for the Mermaid flowchart.
+ * Pure renderer for canonical 3D (BFO) and 4D (ISO 15926) graphs.
+ * 
+ * @param {Object} semanticGraph - Standardised Semantic Graph.
+ * @returns {string} Mermaid chart definition string.
  */
 function buildMermaidDefinition(semanticGraph) {
   // 1. Initialise the graph direction and styling classes
@@ -75,8 +79,6 @@ function buildMermaidDefinition(semanticGraph) {
   def += '  classDef default fill:#f8fafc,stroke:#cbd5e1,color:#334155,stroke-width:1px\n';
   def += '  classDef bfoSys fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
   def += '  classDef bfoElem fill:#64748b,stroke:#475569,color:#ffffff,stroke-width:1px\n';
-  def += '  classDef rdfStmt fill:#f59e0b,stroke:#d97706,color:#000000,stroke-width:1px\n';
-  def += '  classDef rdfLit fill:#f1f5f9,stroke:#cbd5e1,color:#334155,stroke-dasharray:3 3\n';
   def += '  classDef iso4d fill:#4f46e5,stroke:#3730a3,color:#ffffff,stroke-width:2px\n';
   def += '  classDef isoState fill:#0d9488,stroke:#0f766e,color:#ffffff,stroke-width:1px\n\n';
 
@@ -85,20 +87,8 @@ function buildMermaidDefinition(semanticGraph) {
     const safeId = sanitizeId(node.id);
     const styleClass = getNodeClass(node);
     const safeLabel = node.label.replace(/\n/g, '<br/>'); // Support multi-line
-    
-    let shapeOpen = '["';
-    let shapeClose = '"]';
-    
-    // Assign specific shapes based on type
-    if (node.type === 'TemporalPartMembership') {
-      shapeOpen = '{{ "'; // Hexagon for RDF Statements
-      shapeClose = '" }}';
-    } else if (node.type === 'Literal') {
-      shapeOpen = '(["';  // Pill shape for Literals
-      shapeClose = '"])';
-    }
 
-    def += `  ${safeId}${shapeOpen}<b>${safeLabel}</b><br/><i>${node.type}</i>${shapeClose}:::${styleClass}\n`;
+    def += `  ${safeId}["<b>${safeLabel}</b><br/><i>${node.type}</i>"]:::${styleClass}\n`;
   });
 
   def += '\n';
@@ -107,15 +97,10 @@ function buildMermaidDefinition(semanticGraph) {
   semanticGraph.edges.forEach(edge => {
     const safeFrom = sanitizeId(edge.from);
     const safeTo = sanitizeId(edge.to);
-    const isActive = edge.data?.isActive !== false;
-    
-    let linkStyle = '-->'; // Solid line
-    
-    if (!isActive || edge.data?.isPast || edge.type === 'classification') {
-      linkStyle = '-.->'; // Dashed line for inactive, historical, or classification links
-    } else if (edge.type === 'transition') {
-      linkStyle = '==>';  // Thick line for LPG state transitions
-    }
+    const isCurrent = edge.properties?.isCurrent !== false;
+
+    // Solid line for active composition, dashed line for closed or structural classification links
+    const linkStyle = (!isCurrent || edge.type === 'classification') ? '-.->' : '-->';
 
     // Escape quotes in the label
     const safeEdgeLabel = (edge.label || '').replace(/"/g, "'");
@@ -131,12 +116,14 @@ function buildMermaidDefinition(semanticGraph) {
  */
 function getNodeClass(node) {
   switch (node.type) {
-    case 'MaterialEntity': return node.data?.entityType === 'system' ? 'bfoSys' : 'bfoElem';
-    case 'TemporalPartMembership': return 'rdfStmt';
-    case 'Literal': return 'rdfLit';
-    case 'ActualIndividual': return 'iso4d';
-    case 'State': return 'isoState';
-    default: return 'default';
+    case 'MaterialEntity':
+      return node.properties?.entityType === 'system' ? 'bfoSys' : 'bfoElem';
+    case 'ActualIndividual':
+      return 'iso4d';
+    case 'State':
+      return 'isoState';
+    default:
+      return 'default';
   }
 }
 

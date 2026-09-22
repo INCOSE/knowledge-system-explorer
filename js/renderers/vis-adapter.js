@@ -25,7 +25,7 @@ export function initVisNetwork(container) {
  * Updates the network with a new Semantic Graph.
  * 
  * @param {Object} semanticGraph - { nodes: [], edges: [] }
- * @param {boolean} isComplex - Flag to adjust physics for denser graphs (e.g., RDF).
+ * @param {boolean} isComplex - Flag to adjust physics for denser graphs (e.g. ISO 15926 4D).
  */
 export function updateVisNetwork(semanticGraph, isComplex = false) {
   if (!network) {
@@ -96,33 +96,22 @@ export function updateVisNetwork(semanticGraph, isComplex = false) {
 
 /**
  * Determines the visual style of a node based on its ontological type.
+ * Only handles canonical 3D (BFO) and 4D (ISO 15926) domain entities.
+ * 
+ * @param {Object} node - Canonical semantic node.
+ * @returns {Object} Vis.js node styling object.
  */
 function getNodeStyle(node) {
   switch (node.type) {
     // BFO 3D Continuants
-    case 'MaterialEntity':
-      const isSystem = node.data?.entityType === 'system';
+    case 'MaterialEntity': {
+      const isSystem = node.properties?.entityType === 'system';
       return {
         shape: 'box',
         color: isSystem ? '#0284c7' : '#64748b', // Blue for System, Slate for Element
         font: { color: '#ffffff', bold: isSystem }
       };
-    
-    // RDF Reification Statements
-    case 'TemporalPartMembership':
-      const isStmtActive = node.data?.isActive;
-      return {
-        shape: 'diamond',
-        size: 26,
-        color: isStmtActive ? '#f59e0b' : '#e2e8f0', // Amber if active, light grey if past
-        font: { size: 9, color: isStmtActive ? '#000000' : '#64748b' }
-      };
-    case 'Literal':
-      return {
-        shape: 'box',
-        color: '#f8fafc',
-        font: { size: 8, color: '#334155' }
-      };
+    }
 
     // ISO 15926 4D Perdurants
     case 'ActualIndividual':
@@ -131,6 +120,7 @@ function getNodeStyle(node) {
         color: '#4f46e5', // Indigo
         font: { color: '#ffffff', bold: true }
       };
+
     case 'State':
       return {
         shape: 'box',
@@ -144,33 +134,31 @@ function getNodeStyle(node) {
 }
 
 /**
- * Determines the visual style of an edge based on its ontological type and temporal state.
+ * Determines the visual style of an edge based on its ontological type and temporal validity.
+ * 
+ * @param {Object} edge - Canonical semantic edge with properties.
+ * @returns {Object} Vis.js edge styling object.
  */
 function getEdgeStyle(edge) {
-  const isActive = edge.data?.isActive !== false; // Default to true if not explicitly false
-  
+  const isCurrent = edge.properties?.isCurrent !== false;
+
   switch (edge.type) {
     case 'composition':
       return {
-        color: isActive ? { color: '#10b981' } : { color: '#cbd5e1' }, // Emerald active, Slate past
-        dashes: !isActive,
-        width: isActive ? 2 : 1
+        color: isCurrent ? { color: '#10b981' } : { color: '#cbd5e1' }, // Emerald active, Slate past
+        dashes: !isCurrent,
+        width: isCurrent ? 2 : 1
       };
-    case 'transition':
-      return {
-        color: { color: '#f59e0b' }, // Amber for state transitions
-        dashes: false,
-        width: 2
-      };
+
     case 'classification':
-    case 'reification':
       return {
-        color: { color: '#94a3b8' }, // Subtle slate for structural RDF/4D links
-        dashes: edge.data?.isPast || edge.type === 'classification',
+        color: { color: '#94a3b8' }, // Subtle slate for structural 4D temporalPartOf links
+        dashes: !isCurrent,
         width: 1
       };
+
     default:
-      return { color: { color: '#94a3b8' }, dashes: false, width: 1 };
+      return { color: { color: '#94a3b8' }, dashes: !isCurrent, width: 1 };
   }
 }
 
