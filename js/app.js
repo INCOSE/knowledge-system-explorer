@@ -15,8 +15,54 @@ import * as isoAdapter from './smim/iso15926.js';
 import { initVisNetwork, updateVisNetwork } from './renderers/vis-adapter.js';
 import { updateMermaidNetwork } from './renderers/mermaid-adapter.js';
 import { generateBomHtml } from './urmsm/bom-view.js';
-import { generateLpgStorageHtml, generateLpgQuery } from './sms/lpg-generator.js';
-import { generateRdfStorageHtml, generateRdfQuery } from './sms/rdf-generator.js';
+import { generateLpgStorage, generateLpgQuery } from './sms/lpg-generator.js';
+import { generateRdfStorage, generateRdfQuery } from './sms/rdf-generator.js';
+
+/**
+ * Renders an array of LPG relationship storage records as an HTML table.
+ * Applies 'active-row' and 'closed-row' classes for temporal highlighting.
+ *
+ * @param {Array<Object>} rows - Array of LPG relationship records.
+ * @returns {string} HTML table string.
+ */
+function renderLpgTable(rows) {
+  if (!rows || rows.length === 0) {
+    return '<div style="color: #94a3b8; padding: 8px;">No relationship records</div>';
+  }
+
+  let html = '<table><thead><tr>';
+  html += '<th>Source</th><th>Target</th><th>Type</th><th>Properties</th><th>Status</th>';
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(row => {
+    const rowClass = row.isActive ? 'active-row' : 'closed-row';
+    const statusText = row.isActive ? 'Active' : 'Closed';
+
+    // Format relationship properties excluding the internal isCurrent flag
+    const propEntries = Object.entries(row.properties || {})
+      .filter(([key]) => key !== 'isCurrent');
+
+    let propHtml = '—';
+    if (propEntries.length > 0) {
+      const formattedProps = propEntries.map(([k, v]) => {
+        const valStr = v === null ? 'null' : (typeof v === 'number' ? `T${v}` : `'${v}'`);
+        return `${k}: ${valStr}`;
+      }).join(', ');
+      propHtml = `<code>{ ${formattedProps} }</code>`;
+    }
+
+    html += `<tr class="${rowClass}">`;
+    html += `<td>${row.from}</td>`;
+    html += `<td><strong>${row.to}</strong></td>`;
+    html += `<td><code>:${row.label}</code></td>`;
+    html += `<td>${propHtml}</td>`;
+    html += `<td>${statusText}</td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  return html;
+}
 
 const App = {
   setup() {
@@ -147,17 +193,19 @@ const App = {
     
     const storageHtml = computed(() => {
       if (settings.storage === 'LPG') {
-        return generateLpgStorageHtml(semanticGraph.value, settings.ontology);
+        const records = generateLpgStorage(semanticGraph.value);
+        return renderLpgTable(records);
       } else {
-        return generateRdfStorageHtml(semanticGraph.value, settings.ontology);
+        const ttl = generateRdfStorage(semanticGraph.value);
+        return `<pre class="code-block">${ttl}</pre>`;
       }
     });
 
     const queryHtml = computed(() => {
       if (settings.storage === 'LPG') {
-        return generateLpgQuery(settings.ontology, state.currentTime);
+        return generateLpgQuery(semanticGraph.value, state.currentTime);
       } else {
-        return generateRdfQuery(settings.ontology, state.currentTime);
+        return generateRdfQuery(semanticGraph.value, state.currentTime);
       }
     });
 

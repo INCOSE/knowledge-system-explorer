@@ -2,56 +2,61 @@
  * SMS LAYER: LPG GENERATOR
  * ------------------------
  * Simulates how the Semantic Graph is persisted in a Labeled Property Graph
- * database (like Neo4j). Generates storage table views and Cypher queries.
+ * database (such as Neo4j).
+ * Pure storage generator decoupled from ontologies and presentation markup.
  */
 
-export function generateLpgStorageHtml(semanticGraph, ontology) {
-  let html = `<table><thead><tr>`;
-  
-  if (ontology === 'BFO') {
-    html += `<th>Source</th><th>Target</th><th>valid_from</th><th>valid_to</th><th>Status</th></tr></thead><tbody>`;
-    // In BFO LPG, edges carry the temporal validity properties
-    semanticGraph.edges.forEach(e => {
-      const vFrom = e.data?.event?.valid_from;
-      const vTo = e.data?.event?.valid_to;
-      const isActive = e.data?.isActive;
-      const rowClass = isActive ? 'active-row' : 'closed-row';
-      const toText = vTo !== null && vTo !== undefined ? `T${vTo}` : '—';
-      
-      html += `<tr class="${rowClass}"><td>${e.from}</td><td><strong>${e.to}</strong></td><td>T${vFrom}</td><td>${toText}</td><td>${isActive ? 'Active' : 'Closed'}</td></tr>`;
-    });
-  } else {
-    // ISO 15926 LPG
-    html += `<th>Parent Slice</th><th>Child Slice</th><th>LPG Rel Properties</th><th>4D Extent</th></tr></thead><tbody>`;
-    semanticGraph.edges.filter(e => e.type === 'composition').forEach(e => {
-      const vFrom = e.data?.event?.valid_from;
-      const vTo = e.data?.event?.valid_to;
-      const isActive = e.data?.isActive;
-      const span = isActive ? `[T${vFrom}..now]` : `[T${vFrom}..T${vTo}]`;
-      const rowClass = isActive ? 'active-row' : 'closed-row';
-      
-      html += `<tr class="${rowClass}"><td>${e.from}</td><td><strong>${e.to}</strong></td><td><code>{qty: 1, rev: '${e.id}', span: '${span}'}</code></td><td>(Mapped via temporalPartOf)</td></tr>`;
-    });
+/**
+ * Generates an array of LPG edge storage records from a Semantic Graph.
+ *
+ * @param {Object} semanticGraph - Standardised Semantic Graph with nodes and edges.
+ * @returns {Array<Object>} Clean array of relationship records for LPG storage table.
+ */
+export function generateLpgStorage(semanticGraph) {
+  if (!semanticGraph || !Array.isArray(semanticGraph.edges)) {
+    return [];
   }
-  
-  html += '</tbody></table>';
-  return html;
+
+  return semanticGraph.edges.map(edge => {
+    const props = edge.properties ? { ...edge.properties } : {};
+    const isActive = props.isCurrent !== undefined
+      ? Boolean(props.isCurrent)
+      : (props.validTo === null || props.validTo === undefined);
+
+    return {
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      label: edge.label || edge.type || 'RELATED_TO',
+      properties: props,
+      isActive
+    };
+  });
 }
 
-export function generateLpgQuery(ontology, currentTime) {
-  if (ontology === 'BFO') {
-    return `// Cypher (Neo4j) - BFO 3D
-MATCH (p)-[r:has_part]->(c)
-WHERE r.valid_from <= ${currentTime} 
-  AND (r.valid_to IS NULL OR r.valid_to > ${currentTime})
-RETURN p.id AS Parent, c.id AS Child`;
-  } else {
-    return `// Cypher (Neo4j) - ISO 15926 4D
-MATCH (p_state:State)-[:COMPOSED_OF]->(c_state:State)
-WHERE p_state.valid_from <= ${currentTime} 
-  AND (p_state.valid_to IS NULL OR p_state.valid_to > ${currentTime})
+/**
+ * Generates a Cypher query for the specified Semantic Graph at the given point in time.
+ *
+ * @param {Object} semanticGraph - Standardised Semantic Graph with nodes and edges.
+ * @param {number} currentTime - Current discrete time step.
+ * @returns {string} Cypher query string.
+ */
+export function generateLpgQuery(semanticGraph, currentTime) {
+  const is4D = semanticGraph?.nodes?.some(n => n.type === 'State');
+
+  if (is4D) {
+    return `// Cypher (Neo4j) - 4D Perdurant
+MATCH (p_state:State)-[:hasPart]->(c_state:State)
+WHERE p_state.validFrom <= ${currentTime} 
+  AND (p_state.validTo IS NULL OR p_state.validTo > ${currentTime})
 MATCH (p_state)-[:temporalPartOf]->(p_4d:ActualIndividual)
 MATCH (c_state)-[:temporalPartOf]->(c_4d:ActualIndividual)
 RETURN p_4d.id AS Parent4D, c_4d.id AS Child4D`;
   }
+
+  return `// Cypher (Neo4j) - 3D Continuant
+MATCH (p)-[r:has_part]->(c)
+WHERE r.validFrom <= ${currentTime} 
+  AND (r.validTo IS NULL OR r.validTo > ${currentTime})
+RETURN p.id AS Parent, c.id AS Child`;
 }
