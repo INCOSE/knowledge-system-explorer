@@ -136,9 +136,9 @@ const App = {
       const eventsToProcess = showHistory.value ? state.eventLog : activeEdges.value;
       
       if (settings.ontology === 'BFO') {
-        return bfoAdapter.generateSemanticGraph(eventsToProcess, baseNodes.value, state.currentTime, settings.storage);
+        return bfoAdapter.generateSemanticGraph(eventsToProcess, baseNodes.value, state.currentTime);
       } else {
-        return isoAdapter.generateSemanticGraph(eventsToProcess, baseNodes.value, state.currentTime, settings.storage);
+        return isoAdapter.generateSemanticGraph(eventsToProcess, baseNodes.value, state.currentTime);
       }
     });
 
