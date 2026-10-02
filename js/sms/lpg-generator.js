@@ -42,21 +42,36 @@ export function generateLpgStorage(semanticGraph) {
  * @returns {string} Cypher query string.
  */
 export function generateLpgQuery(semanticGraph, currentTime) {
-  const is4D = semanticGraph?.nodes?.some(n => n.type === 'State');
+  if (!semanticGraph) return '';
 
+  const nodes = semanticGraph.nodes || [];
+
+  const is4D = nodes.some(n => n.type === 'State');
   if (is4D) {
-    return `// Cypher (Neo4j) - 4D Perdurant
-MATCH (p_state:State)-[:hasPart]->(c_state:State)
-WHERE p_state.validFrom <= ${currentTime} 
-  AND (p_state.validTo IS NULL OR p_state.validTo > ${currentTime})
-MATCH (p_state)-[:temporalPartOf]->(p_4d:ActualIndividual)
-MATCH (c_state)-[:temporalPartOf]->(c_4d:ActualIndividual)
-RETURN p_4d.id AS Parent4D, c_4d.id AS Child4D`;
+    return `// Cypher (Neo4j) - 4D Perdurant Full Graph Topology
+MATCH (n)-[r]->(m)
+RETURN n, r, m`;
   }
 
-  return `// Cypher (Neo4j) - 3D Continuant
-MATCH (p)-[r:has_part]->(c)
-WHERE r.validFrom <= ${currentTime} 
-  AND (r.validTo IS NULL OR r.validTo > ${currentTime})
-RETURN p.id AS Parent, c.id AS Child`;
+  // Check for BFO Quality (Dependent Continuant)
+  const hasQuality = nodes.some(n => n.type === 'Quality');
+  if (hasQuality) {
+    return `// Cypher (Neo4j) - 3D BFO Full Graph Topology & Inherence
+MATCH (n)-[r]->(m)
+RETURN n, r, m`;
+  }
+
+  // Check if we are in domain / naive mode
+  const domainClasses = ['Vehicle', 'Slot', 'Part', 'Defect', 'Warehouse'];
+  const hasDomainNodes = nodes.some(n => domainClasses.includes(n.type));
+
+  if (hasDomainNodes) {
+    return `// Cypher (Neo4j) - Domain Graph Full Topology & Properties
+MATCH (n)-[r]->(m)
+RETURN n, r, m`;
+  }
+
+  return `// Cypher (Neo4j) - Full Structural Topology & Edge Properties
+MATCH (n)-[r]->(m)
+RETURN n, r, m`;
 }

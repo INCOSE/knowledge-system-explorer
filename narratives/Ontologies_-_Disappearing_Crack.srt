@@ -1,0 +1,149 @@
+1
+00:00:00,000 --> 00:00:05,701
+Welcome to the data sandbox. Currently,
+the system is operating in 'Naive Graph'
+
+2
+00:00:05,701 --> 00:00:11,186
+mode. We have no strict ontological
+rules—just nodes and relationships. Let’s
+
+3
+00:00:11,186 --> 00:00:14,000
+model a typical manufacturing scenario.
+
+4
+00:00:14,029 --> 00:00:19,652
+We have a vehicle. Within it, there is a
+suspension slot, where part "M zero one"
+
+5
+00:00:19,652 --> 00:00:24,361
+is installed. Everything is
+straightforward. But what happens when a
+
+6
+00:00:24,361 --> 00:00:26,189
+real-world problem occurs?
+
+7
+00:00:26,230 --> 00:00:32,184
+During an inspection, a two-millimetre
+crack is discovered on part "M zero one".
+
+8
+00:00:32,184 --> 00:00:35,350
+How do we store this fact in a naive
+graph?
+
+9
+00:00:35,322 --> 00:00:40,485
+The developer faces a dilemma. If we add
+the property "crack: two millimetres"
+
+10
+00:00:40,485 --> 00:00:45,715
+directly to the part node, then when we
+try to query the car's condition a year
+
+11
+00:00:45,715 --> 00:00:50,878
+ago, the system will answer that the part
+was already broken. Because the node
+
+12
+00:00:50,878 --> 00:00:53,962
+exists outside of time—it has been
+overwritten.
+
+13
+00:00:53,923 --> 00:00:59,807
+The obvious workaround is to attach the
+defect information to the temporal edge:
+
+14
+00:00:59,807 --> 00:01:05,095
+"MOUNTED_IN". Excellent. The crack is
+anchored in time. The inspector is
+
+15
+00:01:05,095 --> 00:01:09,043
+satisfied, and the database has saved the
+information.
+
+16
+00:01:08,997 --> 00:01:14,256
+But then comes the next day. The part is
+removed from the vehicle and sent to the
+
+17
+00:01:14,256 --> 00:01:15,637
+warehouse for repair.
+
+18
+00:01:15,607 --> 00:01:21,341
+The mounting edge is closed and archived.
+The part is now linked to the warehouse.
+
+19
+00:01:21,341 --> 00:01:26,438
+Now, let’s ask the system: "How many
+defective parts are currently in the
+
+20
+00:01:26,438 --> 00:01:27,287
+warehouse?".
+
+21
+00:01:27,259 --> 00:01:32,747
+The system answers: Zero. The crack has
+disappeared from the vehicle, but in the
+
+22
+00:01:32,747 --> 00:01:38,097
+warehouse, the part is registered as
+completely flawless! The defect attribute
+
+23
+00:01:38,097 --> 00:01:43,099
+remains buried in the archived mounting
+edge. Our naive approach has just
+
+24
+00:01:43,099 --> 00:01:45,739
+destroyed critical data about a fault.
+
+25
+00:01:45,703 --> 00:01:51,206
+This is exactly where the naive approach
+collapses, and an industrial ontology is
+
+26
+00:01:51,206 --> 00:01:56,503
+required. We are now switching the system
+to ISO fifteen nine twenty-six mode.
+
+27
+00:01:56,467 --> 00:02:01,568
+Under this standard, a part is not a
+static node, but a four-dimensional
+
+28
+00:02:01,568 --> 00:02:06,669
+object with temporal life stages. A
+defect is an independent entity that
+
+29
+00:02:06,669 --> 00:02:12,057
+classifies the condition of a specific
+temporal stage of the part. Now, when
+
+30
+00:02:12,057 --> 00:02:17,445
+moved to the warehouse, the part takes
+its state history with it. Data is no
+
+31
+00:02:17,445 --> 00:02:18,307
+longer lost.
+
