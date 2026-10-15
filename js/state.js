@@ -1,18 +1,16 @@
 import { reactive } from 'vue';
-export { ENTITY_CLASSES, RELATION_TYPES } from './smrm/definitions.js';
+export { ENTITY_CLASSES, RELATION_TYPES, inferEntityClass } from './smrm/definitions.js';
 
 /**
- * SINGLE SOURCE OF TRUTH (Event Sourcing)
- * ---------------------------------------
- * This module holds the pure domain reactive state of the application.
- * According to architecture guidelines, UI settings and visual graph
- * configurations are never stored here.
- * 
- * We only store the absolute domain truth:
- * - Current Time dimension
- * - Event Log (domain business events over time)
- * - Edge/Event sequence counter
- * - Domain settings (e.g. Naive defect target variant)
+ * SINGLE SOURCE OF TRUTH (Event Sourcing & Workbench State)
+ * ---------------------------------------------------------
+ * Central reactive store eliminating duplicate state/settings watchers.
+ *
+ * Perspective values (4 unified viewpoints):
+ * - 'SMRM'    : Engineer Perspective (domain hierarchy, slots/states collapsed)
+ * - 'SMIM'    : Logical Perspective (canonical 3D BFO / 4D ISO 15926 / Naive topology)
+ * - 'SMS_LPG' : Physical LPG Perspective (Property Graph storage & state transitions)
+ * - 'SMS_RDF' : Physical RDF Perspective (W3C RDF triples, reification & literals)
  */
 export const state = reactive({
   // 1. Navigation View ('MENU' | 'SANDBOX' | 'SCENARIO')
@@ -27,65 +25,104 @@ export const state = reactive({
   // 4. Current Domain Ontology ('NAIVE_NODE' | 'NAIVE_EDGE' | 'BFO' | 'ISO15926')
   ontology: 'NAIVE_NODE',
 
-  // 5. The Event Log (The core of our Domain-Driven Event Sourcing)
-  // Format: Pure business events (e.g. REGISTER_PART, ASSEMBLE, REPORT_DEFECT, DISMANTLE)
-  eventLog: [],
-
-  // 6. Counter to ensure unique identifiers for events
-  edgeSequence: 1,
-
-  // 7. Perspective View ('SMRM' | 'SMIM' | 'SMS')
+  // 5. Unified Perspective ('SMRM' | 'SMIM' | 'SMS_LPG' | 'SMS_RDF')
   perspective: 'SMRM',
 
-  // 8. Visual Graph Engine ('VIS' | 'MERMAID')
-  graphEngine: 'VIS'
+  // 6. Active Physical Storage Paradigm ('LPG' | 'RDF')
+  // Automatically switched when selecting 'SMS_LPG' or 'SMS_RDF'
+  storage: 'LPG',
+
+  // 7. Visual Graph Engine ('VIS' | 'MERMAID')
+  graphEngine: 'VIS',
+
+  // 8. UI Locale ('sv' | 'en' | 'ru')
+  language: 'en',
+
+  // 9. Toggle visibility of historical (closed) relationships
+  showHistory: true,
+
+  // 10. The Event Log (Pure business events)
+  eventLog: [],
+
+  // 11. Monotonic counter for unique event IDs
+  edgeSequence: 1
 });
 
 /**
  * Advances the global system time by one unit (T = T + 1).
- * Because 'state' is reactive, calling this will automatically trigger UI updates.
  */
 export function advanceTime() {
   state.currentTime++;
 }
 
 /**
- * Completely replaces the current domain state.
- * Useful for loading a saved JSON file or injecting a predefined scenario.
- * 
- * @param {Object} newState - The data object containing the state to inject.
+ * Returns the next monotonic sequence integer and increments the counter.
+ * @returns {number}
  */
-export function loadState(newState) {
-  if (newState.currentView !== undefined) {
-    state.currentView = newState.currentView;
-  }
+export function nextSequence() {
+  return state.edgeSequence++;
+}
 
-  if (newState.userRole !== undefined) {
-    state.userRole = newState.userRole;
-  }
-
-  if (newState.ontology !== undefined) {
-    state.ontology = newState.ontology;
-  }
-
-  if (newState.currentTime !== undefined) {
-    state.currentTime = newState.currentTime;
-  }
-  
-  if (newState.eventLog) {
-    state.eventLog.splice(0, state.eventLog.length, ...newState.eventLog);
-  }
-  
-  if (newState.edgeSequence !== undefined) {
-    state.edgeSequence = newState.edgeSequence;
-  }
-
-  if (newState.perspective !== undefined) {
-    state.perspective = newState.perspective;
-  }
-
-  if (newState.graphEngine !== undefined) {
-    state.graphEngine = newState.graphEngine;
+/**
+ * Sets the active perspective and synchronises the physical storage mode ('LPG' | 'RDF')
+ * so that UNDER THE BONNET and DATABASE QUERY always match the selected Physical view.
+ *
+ * @param {'SMRM'|'SMIM'|'SMS_LPG'|'SMS_RDF'|'SMS'} newPerspective
+ */
+export function setPerspective(newPerspective) {
+  if (newPerspective === 'SMS_LPG') {
+    state.perspective = 'SMS_LPG';
+    state.storage = 'LPG';
+  } else if (newPerspective === 'SMS_RDF') {
+    state.perspective = 'SMS_RDF';
+    state.storage = 'RDF';
+  } else if (newPerspective === 'SMS') {
+    state.perspective = state.storage === 'RDF' ? 'SMS_RDF' : 'SMS_LPG';
+  } else if (newPerspective === 'SMIM' || newPerspective === 'SMRM') {
+    state.perspective = newPerspective;
   }
 }
 
+/**
+ * Completely replaces or updates the current state from a saved JSON object or scenario.
+ *
+ * @param {Object} newState - State payload to inject.
+ */
+export function loadState(newState) {
+  if (!newState || typeof newState !== 'object') return;
+
+  if (newState.currentView !== undefined) {
+    state.currentView = newState.currentView;
+  }
+  if (newState.userRole !== undefined) {
+    state.userRole = newState.userRole;
+  }
+  if (newState.ontology !== undefined) {
+    const onto = newState.ontology;
+    state.ontology = onto === 'ISO_15926_4D' ? 'ISO15926' : (onto === 'NAIVE' ? 'NAIVE_NODE' : onto);
+  }
+  if (newState.storage === 'LPG' || newState.storage === 'RDF') {
+    state.storage = newState.storage;
+  }
+  if (newState.perspective !== undefined) {
+    setPerspective(newState.perspective);
+  }
+  if (newState.currentTime !== undefined) {
+    state.currentTime = newState.currentTime;
+  }
+  if (Array.isArray(newState.eventLog)) {
+    state.eventLog.splice(0, state.eventLog.length, ...newState.eventLog);
+  }
+  if (newState.edgeSequence !== undefined) {
+    state.edgeSequence = newState.edgeSequence;
+  }
+  if (newState.graphEngine !== undefined) {
+    state.graphEngine = String(newState.graphEngine).toUpperCase() === 'MERMAID' ? 'MERMAID' : 'VIS';
+  }
+  if (newState.language !== undefined) {
+    state.language = newState.language;
+  }
+  if (newState.showHistory !== undefined) {
+    state.showHistory = Boolean(newState.showHistory);
+  }
+}

@@ -1,58 +1,54 @@
 /**
  * VIS.JS RENDERER ADAPTER
  * -----------------------
- * This module is responsible for bridging the abstract Semantic Graph
- * with the visual representations required by the Vis.js Network library.
- * It strictly handles styling (colours, shapes, physics) based on node/edge types.
+ * Bridges the abstract Semantic Graph with Vis.js Network.
+ * Uses incremental DataSet diffing so the graph layout stays stable across time steps.
  */
 
-// We assume 'vis' is available globally via the CDN imported in index.html.
+import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
+
 let network = null;
 const visNodes = new vis.DataSet();
 const visEdges = new vis.DataSet();
 
 /**
  * Initialises the Vis.js network instance in the specified DOM container.
- * 
+ *
  * @param {HTMLElement} container - The DOM element to host the canvas.
  */
 export function initVisNetwork(container) {
+  if (!container) return;
   if (network) {
     network.destroy();
     network = null;
   }
+  visNodes.clear();
+  visEdges.clear();
   const data = { nodes: visNodes, edges: visEdges };
   network = new vis.Network(container, data, getBaseOptions(false));
 }
 
 /**
- * Updates the network with a new Semantic Graph.
- * 
+ * Updates the network with a new Semantic Graph using non-destructive DataSet diffing.
+ *
  * @param {Object} semanticGraph - { nodes: [], edges: [] }
- * @param {boolean} isComplex - Flag to adjust physics for denser graphs (e.g. ISO 15926 4D).
+ * @param {boolean} isComplex - Flag to adjust physics for denser graphs.
  */
 export function updateVisNetwork(semanticGraph, isComplex = false) {
-  if (!network) {
-    console.error("[Vis Adapter] Network not initialised. Call initVisNetwork first.");
-    return;
-  }
+  if (!network || !semanticGraph) return;
 
-  // Update physics options based on graph complexity
   network.setOptions(getBaseOptions(isComplex));
 
-  // Clear existing data
-  visNodes.clear();
-  visEdges.clear();
-
-  // 1. Map and style Nodes directly from the Semantic Graph (pure renderer)
+  // 1. Map and style Nodes
+  const incomingNodeIds = new Set();
   const styledNodes = (semanticGraph.nodes || []).map(node => {
+    incomingNodeIds.add(node.id);
     const style = getNodeStyle(node);
-    
-    // Display custom properties directly on the node label if present
+
     let displayLabel = node.label || node.id;
     if (node.properties) {
       const customProps = Object.entries(node.properties).filter(
-        ([k]) => !['isCurrent', 'originalId', 'entityType', 'validFrom', 'validTo', 'ownerId'].includes(k)
+        ([k, v]) => !INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null
       );
       if (customProps.length > 0) {
         const propStr = customProps.map(([k, v]) => `${k}: ${v}`).join(', ');
@@ -78,34 +74,39 @@ export function updateVisNetwork(semanticGraph, isComplex = false) {
 
     return styledNode;
   });
-  visNodes.add(styledNodes);
+
+  // Remove obsolete nodes and update/add current nodes
+  const existingNodeIds = visNodes.getIds();
+  const nodesToRemove = existingNodeIds.filter(id => !incomingNodeIds.has(id));
+  if (nodesToRemove.length > 0) visNodes.remove(nodesToRemove);
+  if (styledNodes.length > 0) visNodes.update(styledNodes);
 
   // 2. Map and style Edges
-  // We need to handle overlapping edges (multiple events between same parent/child)
   const pairMap = {};
-  semanticGraph.edges.forEach(edge => {
+  (semanticGraph.edges || []).forEach(edge => {
     const pairKey = `${edge.from}->${edge.to}`;
     if (!pairMap[pairKey]) pairMap[pairKey] = [];
     pairMap[pairKey].push(edge);
   });
 
+  const incomingEdgeIds = new Set();
   const styledEdges = [];
+
   Object.values(pairMap).forEach(edgesGroup => {
     const count = edgesGroup.length;
-    
+
     edgesGroup.forEach((edge, idx) => {
-      // Create a smooth curve if multiple edges exist between the same nodes
-      const smoothConfig = count === 1 
+      incomingEdgeIds.add(edge.id);
+      const smoothConfig = count === 1
         ? { type: 'continuous', roundness: 0.2 }
         : { type: 'curvedCW', roundness: Math.min(0.14 + (idx * 0.14), 0.85) };
 
       const style = getEdgeStyle(edge);
 
-      // Display custom properties directly on the edge label if present
-      let displayEdgeLabel = edge.label;
+      let displayEdgeLabel = edge.label || '';
       if (edge.properties) {
         const customEdgeProps = Object.entries(edge.properties).filter(
-          ([k]) => !['isCurrent', 'validFrom', 'validTo'].includes(k)
+          ([k, v]) => !INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null
         );
         if (customEdgeProps.length > 0) {
           const propStr = customEdgeProps.map(([k, v]) => `${k}: ${v}`).join(', ');
@@ -127,110 +128,59 @@ export function updateVisNetwork(semanticGraph, isComplex = false) {
     });
   });
 
-  visEdges.add(styledEdges);
+  const existingEdgeIds = visEdges.getIds();
+  const edgesToRemove = existingEdgeIds.filter(id => !incomingEdgeIds.has(id));
+  if (edgesToRemove.length > 0) visEdges.remove(edgesToRemove);
+  if (styledEdges.length > 0) visEdges.update(styledEdges);
 }
 
-/**
- * Determines the visual style of a node based on its ontological type.
- * Only handles canonical 3D (BFO) and 4D (ISO 15926) domain entities.
- * 
- * @param {Object} node - Canonical semantic node.
- * @returns {Object} Vis.js node styling object.
- */
 function getNodeStyle(node) {
   const entityType = node.type || node.properties?.entityClass || node.properties?.entityType;
 
   switch (entityType) {
-    // Specific Manufacturing Domain Classes (Naive Mode)
     case 'Vehicle':
-      return {
-        shape: 'box',
-        color: '#0284c7', // Blue
-        font: { color: '#ffffff', bold: true }
-      };
-
+      return { shape: 'box', color: '#0284c7', font: { color: '#ffffff', bold: true } };
     case 'Slot':
-      return {
-        shape: 'box',
-        color: '#64748b', // Grey
-        font: { color: '#ffffff' }
-      };
-
+      return { shape: 'box', color: '#64748b', font: { color: '#ffffff' } };
     case 'Part':
-      return {
-        shape: 'box',
-        color: '#10b981', // Green
-        font: { color: '#ffffff', bold: true }
-      };
-
+      return { shape: 'box', color: '#10b981', font: { color: '#ffffff', bold: true } };
     case 'Defect':
-      return {
-        shape: 'diamond',
-        size: 25,
-        color: '#ef4444', // Red
-        font: { color: '#ffffff', bold: true }
-      };
-
+      return { shape: 'diamond', size: 25, color: '#ef4444', font: { color: '#ffffff', bold: true } };
     case 'Warehouse':
-      return {
-        shape: 'box',
-        color: '#f97316', // Orange
-        font: { color: '#ffffff', bold: true }
-      };
-
-    // BFO 3D Continuants
+      return { shape: 'box', color: '#f97316', font: { color: '#ffffff', bold: true } };
     case 'MaterialEntity': {
-      const isSystem = node.properties?.entityType === 'system';
+      const isSystem = node.properties?.entityType === 'system' || node.properties?.entityClass === 'Vehicle';
       return {
         shape: 'box',
-        color: isSystem ? '#0284c7' : '#64748b', // Blue for System, Slate for Element
+        color: isSystem ? '#0284c7' : '#64748b',
         font: { color: '#ffffff', bold: isSystem }
       };
     }
-
     case 'Quality':
     case 'DependentContinuant':
-      return {
-        shape: 'diamond',
-        size: 25,
-        color: '#f59e0b', // Amber / orange for Dependent Continuant
-        font: { color: '#000000', bold: true }
-      };
-
-    // W3C RDF Reification and Literals (SMS physical layer)
+      return { shape: 'diamond', size: 25, color: '#f59e0b', font: { color: '#000000', bold: true } };
     case 'RelationalQuality':
     case 'TemporalPartMembership': {
       const isStmtActive = node.properties?.isCurrent !== false;
       return {
         shape: 'diamond',
-        size: 15,
-        color: isStmtActive ? '#f59e0b' : '#e2e8f0', // Amber if active, light grey if past
+        size: 16,
+        color: isStmtActive ? '#f59e0b' : '#e2e8f0',
         font: { size: 10, color: isStmtActive ? '#000000' : '#64748b', bold: true }
       };
     }
-
     case 'Literal':
-      return {
-        shape: 'ellipse', // Oval shape
-        color: '#f8fafc',
-        font: { size: 8, color: '#334155' }
-      };
-
-    // ISO 15926 4D Perdurants
+      return { shape: 'ellipse', color: '#f8fafc', font: { size: 9, color: '#334155' } };
     case 'ActualIndividual':
+      return { shape: 'box', color: '#4f46e5', font: { color: '#ffffff', bold: true } };
+    case 'State': {
+      const isStateActive = node.properties?.isCurrent !== false;
       return {
         shape: 'box',
-        color: '#4f46e5', // Indigo
-        font: { color: '#ffffff', bold: true }
-      };
-
-    case 'State':
-      return {
-        shape: 'box',
-        color: '#0d9488', // Teal
+        color: isStateActive ? '#0d9488' : '#94a3b8',
         font: { color: '#ffffff' }
       };
-
+    }
     default: {
       if (/^def/i.test(node.id)) {
         return { shape: 'diamond', color: '#ef4444', font: { color: '#ffffff', bold: true } };
@@ -243,94 +193,49 @@ function getNodeStyle(node) {
   }
 }
 
-/**
- * Determines the visual style of an edge based on its ontological type and temporal validity.
- * 
- * @param {Object} edge - Canonical semantic edge with properties.
- * @returns {Object} Vis.js edge styling object.
- */
 function getEdgeStyle(edge) {
   const isCurrent = edge.properties?.isCurrent !== false;
+  const rel = edge.type || edge.label;
 
-  switch (edge.type) {
+  if (!isCurrent) {
+    return { color: { color: '#cbd5e1' }, dashes: true, width: 1 };
+  }
+
+  switch (rel) {
     case 'has_slot':
-      return {
-        color: isCurrent ? { color: '#0284c7' } : { color: '#cbd5e1' }, // Blue
-        dashes: !isCurrent,
-        width: isCurrent ? 2 : 1
-      };
-
+      return { color: { color: '#0284c7' }, dashes: false, width: 2 };
     case 'mounted_in':
-      return {
-        color: isCurrent ? { color: '#10b981' } : { color: '#cbd5e1' }, // Green
-        dashes: !isCurrent,
-        width: isCurrent ? 2 : 1
-      };
-
-    case 'stored_at':
-      return {
-        color: isCurrent ? { color: '#f97316' } : { color: '#cbd5e1' }, // Orange
-        dashes: !isCurrent,
-        width: isCurrent ? 2 : 1
-      };
-
-    case 'has_defect':
-      return {
-        color: isCurrent ? { color: '#ef4444' } : { color: '#cbd5e1' }, // Red
-        dashes: !isCurrent,
-        width: 2
-      };
-
-    case 'inherence':
-      return {
-        color: isCurrent ? { color: '#f59e0b' } : { color: '#cbd5e1' }, // Amber for inheres_in
-        dashes: !isCurrent,
-        width: 2
-      };
-
     case 'composition':
     case 'has_part':
-      return {
-        color: isCurrent ? { color: '#10b981' } : { color: '#cbd5e1' }, // Emerald active, Slate past
-        dashes: !isCurrent,
-        width: isCurrent ? 2 : 1
-      };
-
+      return { color: { color: '#10b981' }, dashes: false, width: 2 };
+    case 'stored_at':
+      return { color: { color: '#f97316' }, dashes: false, width: 2 };
+    case 'has_defect':
+      return { color: { color: '#ef4444' }, dashes: false, width: 2 };
+    case 'inherence':
+      return { color: { color: '#f59e0b' }, dashes: false, width: 2 };
     case 'transition':
-      return {
-        color: { color: '#f59e0b' }, // Amber for LPG state transitions
-        dashes: false,
-        width: 2
-      };
-
+      return { color: { color: '#f59e0b' }, dashes: false, width: 2 };
     case 'classification':
     case 'reification':
     case 'predicate':
-      return {
-        color: { color: '#94a3b8' }, // Subtle slate for structural 4D or RDF links
-        dashes: !isCurrent,
-        width: 1
-      };
-
+      return { color: { color: '#94a3b8' }, dashes: true, width: 1 };
     default:
-      return { color: { color: '#94a3b8' }, dashes: !isCurrent, width: 1 };
+      return { color: { color: '#94a3b8' }, dashes: false, width: 1 };
   }
 }
 
-/**
- * Generates the physics configuration for the Vis.js canvas.
- */
 function getBaseOptions(isComplex) {
   return {
     physics: {
-      stabilization: { iterations: 120 },
-      barnesHut: { 
-        gravitationalConstant: isComplex ? -24000 : -10000, 
-        centralGravity: 0.25, 
-        springLength: isComplex ? 220 : 150, 
-        springConstant: 0.04, 
-        damping: 0.09, 
-        avoidOverlap: 1 
+      stabilization: { iterations: 80, fit: true },
+      barnesHut: {
+        gravitationalConstant: isComplex ? -22000 : -10000,
+        centralGravity: 0.25,
+        springLength: isComplex ? 200 : 140,
+        springConstant: 0.04,
+        damping: 0.12,
+        avoidOverlap: 0.9
       }
     },
     edges: { arrows: 'to' }

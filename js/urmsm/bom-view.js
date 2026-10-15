@@ -1,88 +1,137 @@
 /**
  * URMSM LAYER: BOM VIEW (Stakeholder Viewpoint)
  * ---------------------------------------------
- * This module generates the user-facing Bill of Materials (BOM) tree.
- * According to ISO 42010, this is a specific viewpoint for an engineer
- * who only cares about the physical breakdown at time T, abstracting away
- * the underlying database mechanics (LPG/RDF) and temporal ontologies.
- * 
- * Returns pure hierarchical data structures without any DOM or HTML coupling.
+ * Generates the user-facing Bill of Materials (BOM) hierarchy for the active
+ * ontology at time T:
+ * - Dynamically discovers all active root containers (Vehicles, Warehouses).
+ * - Never renders a phantom 'System_A' when the graph is empty.
+ * - Collapses technical Slot nodes via SMRM reduction.
+ * - Attaches active defect indicators (e.g. 'crack: 2mm') to components if and only if
+ *   the defect survives in the active ontology at time T.
  */
 
+import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
+import { reduceGraphForSMRM } from './smrm-view.js';
+
 /**
- * Recursively builds a pure hierarchical tree structure for the BOM.
- * 
- * @param {string} rootId - The ID of the top-level system.
- * @param {Array<Object>} activeEdges - Array of currently active edges (filtered for Time = T).
- * @returns {Object} Hierarchical node structure: { id: string, children: Array<Object> }.
+ * Generates an array of root BOM trees from the current canonical Semantic Graph.
+ *
+ * @param {Object} semanticGraph - Canonical SMIM Semantic Graph ({ nodes, edges }).
+ * @returns {Array<{ id: string, entityClass: string, defects: Array<string>, children: Array }>}
  */
-export function generateBomTree(rootId, activeEdges) {
-  return buildTreeRecursive(rootId, activeEdges || [], new Set());
+export function generateBomTrees(semanticGraph) {
+  if (!semanticGraph || !Array.isArray(semanticGraph.nodes) || semanticGraph.nodes.length === 0) {
+    return [];
+  }
+
+  // Reduce to Engineer SMRM graph so Slots, 4D Extents, and Qualities are normalised
+  const smrmGraph = reduceGraphForSMRM(semanticGraph);
+  const activeEdges = smrmGraph.edges.filter(e => e.properties?.isCurrent !== false);
+
+  // Map active defects per component ID
+  const defectsByNode = new Map();
+  const addDefect = (nodeId, label) => {
+    if (!defectsByNode.has(nodeId)) defectsByNode.set(nodeId, new Set());
+    defectsByNode.get(nodeId).add(label);
+  };
+
+  // 1a. Check custom properties on nodes (Naive Node mode)
+  smrmGraph.nodes.forEach(node => {
+    if (node.type === 'Defect') return;
+    if (node.properties) {
+      Object.entries(node.properties).forEach(([k, v]) => {
+        if (!INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null) {
+          addDefect(node.id, `${k}: ${v}`);
+        }
+      });
+    }
+  });
+
+  // 1b. Check custom properties on active structural edges (Naive Edge mode)
+  activeEdges.forEach(edge => {
+    const childId = edge.childId || (edge.label === 'stored_at' || edge.label === 'mounted_in' ? edge.from : edge.to);
+    if (edge.properties && childId) {
+      Object.entries(edge.properties).forEach(([k, v]) => {
+        if (!INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null) {
+          addDefect(childId, `${k}: ${v}`);
+        }
+      });
+    }
+  });
+
+  // 1c. Check explicit Defect nodes linked via active 'has_defect' edges (BFO & ISO 15926)
+  activeEdges.forEach(edge => {
+    if (edge.label === 'has_defect' || edge.type === 'has_defect') {
+      const defectNode = smrmGraph.nodes.find(n => n.id === edge.to);
+      if (defectNode) {
+        const dType = defectNode.properties?.defectType || defectNode.properties?.qualityType || 'defect';
+        const dVal = defectNode.properties?.value || 'present';
+        addDefect(edge.from, `${dType}: ${dVal}`);
+      }
+    }
+  });
+
+  // Build parent -> children adjacency for active structural relations
+  const childrenMap = new Map();
+  const hasParentSet = new Set();
+
+  activeEdges.forEach(edge => {
+    if (edge.label === 'has_defect' || edge.type === 'has_defect') return;
+
+    let parentId = null;
+    let childId = null;
+
+    if (edge.label === 'has_part' || edge.label === 'has_slot') {
+      parentId = edge.from;
+      childId = edge.to;
+    } else if (edge.label === 'mounted_in' || edge.label === 'stored_at') {
+      parentId = edge.to;
+      childId = edge.from;
+    }
+
+    if (parentId && childId && parentId !== childId) {
+      if (!childrenMap.has(parentId)) childrenMap.set(parentId, new Set());
+      childrenMap.get(parentId).add(childId);
+      hasParentSet.add(childId);
+    }
+  });
+
+  // Identify root nodes (Vehicles, Warehouses, or top-level assemblies without a parent)
+  const candidateRoots = smrmGraph.nodes.filter(n => {
+    if (n.type === 'Defect' || n.type === 'Slot') return false;
+    if (hasParentSet.has(n.id)) return false;
+    return n.type === 'Vehicle' || n.type === 'Warehouse' || childrenMap.has(n.id);
+  });
+
+  function buildNode(nodeId, visited = new Set()) {
+    if (visited.has(nodeId)) {
+      return { id: nodeId, defects: [], children: [] };
+    }
+    const nextVisited = new Set(visited);
+    nextVisited.add(nodeId);
+
+    const nodeObj = smrmGraph.nodes.find(n => n.id === nodeId);
+    const childIds = Array.from(childrenMap.get(nodeId) || []);
+    const defects = Array.from(defectsByNode.get(nodeId) || []);
+
+    return {
+      id: nodeId,
+      entityClass: nodeObj?.type || 'Part',
+      defects,
+      children: childIds.map(cid => buildNode(cid, nextVisited))
+    };
+  }
+
+  return candidateRoots.map(root => buildNode(root.id));
 }
 
 /**
- * Helper function to recursively populate tree nodes while guarding against circular references.
- * Strictly traverses the ontological hierarchy: Parent -> Slot -> Child.
- * 
- * - When at a Parent (non-Slot): traverses outgoing has_slot or has_part edges to find contextual Slots or sub-components.
- * - When at a Slot: traverses incoming mounted_in edges to locate the mounted Child component.
- * - Under no circumstances does a Slot traverse backwards to its Parent, or a Child backwards to its Slot.
- * 
- * @param {string} nodeId - Current node identifier.
- * @param {Array<Object>} activeEdges - Array of active relationship edges.
- * @param {Set<string>} visited - Set of previously visited node identifiers to avoid cycles.
- * @returns {Object} Tree node object.
+ * Backwards-compatible single-root helper.
  */
-function buildTreeRecursive(nodeId, activeEdges, visited = new Set()) {
-  if (visited.has(nodeId)) {
-    return { id: nodeId, children: [] };
-  }
-
-  const nextVisited = new Set(visited);
-  nextVisited.add(nodeId);
-
-  const childIds = new Set();
-  const edges = activeEdges || [];
-
-  // Determine if the current node is a contextual Slot
-  const isSlotNode = nodeId.startsWith('Slot_') ||
-    nodeId.startsWith('st_Slot_') ||
-    edges.some(e => e.to === nodeId && (e.label === 'has_slot' || e.type === 'has_slot'));
-
-  if (isSlotNode) {
-    // A Slot ONLY contains components mounted into it (Child -[mounted_in]-> Slot)
-    edges.forEach(e => {
-      const rel = e.label || e.relationType || e.type;
-      if (e.to === nodeId && (rel === 'mounted_in' || e.label === 'mounted_in')) {
-        if (!nextVisited.has(e.from)) {
-          childIds.add(e.from);
-        }
-      }
-    });
-  } else {
-    // A non-Slot component/system traverses forward:
-    // 1. Outgoing slots: Parent -[has_slot]-> Slot
-    // 2. Direct sub-components: Parent -[has_part]-> Child
-    edges.forEach(e => {
-      const rel = e.label || e.relationType || e.type;
-      if (e.from === nodeId) {
-        if (rel === 'has_slot' || e.label === 'has_slot') {
-          if (!nextVisited.has(e.to)) {
-            childIds.add(e.to);
-          }
-        } else if (rel === 'has_part' || e.label === 'has_part') {
-          if (!nextVisited.has(e.to)) {
-            childIds.add(e.to);
-          }
-        }
-      }
-    });
-  }
-
-  const children = Array.from(childIds).map(childId => buildTreeRecursive(childId, edges, nextVisited));
-
-  return {
-    id: nodeId,
-    children
-  };
+export function generateBomTree(rootId, activeEdges) {
+  const trees = generateBomTrees({
+    nodes: [{ id: rootId, type: 'Vehicle', properties: {} }],
+    edges: activeEdges || []
+  });
+  return trees[0] || null;
 }

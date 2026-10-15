@@ -2,44 +2,50 @@
  * BFO ONTOLOGY ADAPTER (3D Continuant)
  * ------------------------------------
  * Maps Domain Business Events into a canonical 3D BFO Semantic Graph.
- * 
+ *
  * Ontological Axioms:
- * - Entities (Vehicle, Part, Warehouse) are Independent Continuants ('MaterialEntity')
- *   that endure wholly through time without temporal parts or states.
- * - Defect observations are Specifically Dependent Continuants ('Quality')
- *   that exist only by inhering in an independent continuant via the 'inheres_in' relation.
- * - Relationships between continuants (mounted_in, stored_at, etc.) hold directly
- *   between the continuants at a given time, carrying temporal validity intervals.
- * - Both the Quality node and the 'inheres_in' edge record validFrom: timestamp.
- * - NEVER generates 'State' or 'Temporal Part' nodes.
- * 
- * @param {Array} eventLog - The projection of temporal business events.
- * @param {Array} [baseNodes=[]] - The projection of base continuant entities.
- * @param {number|null} [currentTime=null] - Global time to evaluate current validity.
- * @returns {{ nodes: Array, edges: Array }} The canonical Semantic Graph.
+ * - Physical entities (Vehicle, Part, Warehouse, Slot) are Independent Continuants ('MaterialEntity').
+ * - Defect observations are Specifically Dependent Continuants ('Quality') inhering in their
+ *   bearer via 'inheres_in'. Because the Quality inheres in the Part itself (not the mounting slot),
+ *   moving the Part to a Warehouse preserves its Quality!
  */
 
-export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime = null) {
+import { inferEntityClass } from '../smrm/definitions.js';
+
+/**
+ * Generates the 3D BFO Semantic Graph from the event log up to currentTime.
+ *
+ * @param {Array} eventLog - Temporal business events.
+ * @param {Array} [baseNodes=[]] - Initial base entities.
+ * @param {number|null} [currentTime=null] - Global evaluation time T.
+ * @param {Object} [options={}] - { showHistory: boolean }.
+ * @returns {{ nodes: Array, edges: Array }}
+ */
+export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime = null, options = {}) {
   const nodeMap = new Map();
   const edges = [];
+  const showHistory = options.showHistory !== undefined ? Boolean(options.showHistory) : true;
 
   function ensureContinuantNode(partId, overrideClass = null) {
     if (!nodeMap.has(partId)) {
+      const entityClass = inferEntityClass(partId, overrideClass);
       nodeMap.set(partId, {
         id: partId,
         label: partId,
         type: 'MaterialEntity',
         properties: {
           originalId: partId,
-          entityClass: overrideClass || inferContinuantClass(partId)
+          entityClass,
+          entityType: entityClass === 'Vehicle' ? 'system' : 'element'
         }
       });
     }
+    return nodeMap.get(partId);
   }
 
-  // 1. Initialise base continuant entities (if provided)
+  // 1. Initialise base continuant entities
   (baseNodes || []).forEach(bn => {
-    ensureContinuantNode(bn.id);
+    ensureContinuantNode(bn.id, bn.entityClass || bn.type);
   });
 
   // 2. Filter and sort business events by timestamp
@@ -48,12 +54,11 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
     .slice()
     .sort((a, b) => (a.valid_from || 0) - (b.valid_from || 0));
 
-
   // 3. Process business events in temporal order
   eventsToProcess.forEach(event => {
     switch (event.type) {
       case 'REGISTER_PART': {
-        ensureContinuantNode(event.partId);
+        ensureContinuantNode(event.partId, event.entityClass);
         break;
       }
 
@@ -84,12 +89,11 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           break;
         }
 
-        // Implicit contextual Slot generation: Slot_${parentId}_${childId}
+        // Contextual Slot generation: Slot_${parentId}_${childId}
         const slotId = `Slot_${parentId}_${childId}`;
         ensureContinuantNode(slotId, 'Slot');
 
-        // Link 1: Parent -> Slot (has_slot)
-        const slotEdgeId = `edge_slot_${parentId}_${slotId}_${timestamp}`;
+        const slotEdgeId = `edge_slot_${event.id || `${parentId}_${slotId}_${timestamp}`}`;
         edges.push({
           id: slotEdgeId,
           from: parentId,
@@ -97,7 +101,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           label: 'has_slot',
           type: 'has_slot',
           childId: slotId,
-          parentId: parentId,
+          parentId,
           properties: {
             validFrom: timestamp,
             validTo: null,
@@ -105,7 +109,6 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           }
         });
 
-        // Link 2: Child -> Slot (mounted_in)
         const mountEdgeId = event.id ? `edge_${event.id}` : `edge_${childId}_${slotId}_${timestamp}`;
         edges.push({
           id: mountEdgeId,
@@ -113,7 +116,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           to: slotId,
           label: 'mounted_in',
           type: 'composition',
-          childId: childId,
+          childId,
           parentId: slotId,
           properties: {
             validFrom: timestamp,
@@ -128,7 +131,6 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         const { childId } = event;
         const dismantleTime = event.valid_from;
 
-        // Locate active assembly relationship for the child component
         const activeEdge = edges.find(
           e => (e.childId === childId || e.from === childId) &&
                (e.label === 'mounted_in' || e.label === 'stored_at') &&
@@ -136,11 +138,17 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         );
         if (activeEdge) {
           activeEdge.properties.validTo = dismantleTime;
-          activeEdge.properties.isCurrent = (currentTime !== null && currentTime !== undefined)
-            ? dismantleTime > currentTime
-            : false;
-        } else {
-          console.warn(`[SMIM BFO] No active assembly relationship found to dismantle child part: ${childId}`);
+
+          if (activeEdge.to && activeEdge.to.startsWith('Slot_')) {
+            const slotEdge = edges.find(
+              e => e.to === activeEdge.to &&
+                   e.label === 'has_slot' &&
+                   e.properties.validTo === null
+            );
+            if (slotEdge) {
+              slotEdge.properties.validTo = dismantleTime;
+            }
+          }
         }
         break;
       }
@@ -154,7 +162,6 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         const qualityId = `qual_${targetId}_${defectName}`;
         const qualityLabel = `${capitalize(defectName)}: ${defectValue}`;
 
-        // Specifically Dependent Continuant (Quality) node recording validFrom
         nodeMap.set(qualityId, {
           id: qualityId,
           label: qualityLabel,
@@ -165,11 +172,12 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
             value: defectValue,
             bearerId: targetId,
             entityClass: 'Quality',
-            validFrom: timestamp
+            validFrom: timestamp,
+            validTo: null,
+            isCurrent: true
           }
         });
 
-        // Canonical BFO relation: Quality inheres_in Independent Continuant (with validFrom)
         const edgeId = `inh_${targetId}_${defectName}_${timestamp}`;
         edges.push({
           id: edgeId,
@@ -186,6 +194,24 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         break;
       }
 
+      case 'REVOKE_DEFECT': {
+        const { targetId, defectName } = event;
+        const revokeTime = event.valid_from;
+        const qualityId = `qual_${targetId}_${defectName}`;
+
+        const activeInherence = edges.find(
+          e => e.from === qualityId && e.to === targetId && e.label === 'inheres_in' && e.properties.validTo === null
+        );
+        if (activeInherence) {
+          activeInherence.properties.validTo = revokeTime;
+        }
+        const qNode = nodeMap.get(qualityId);
+        if (qNode && qNode.properties) {
+          qNode.properties.validTo = revokeTime;
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -197,30 +223,29 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
       (currentTime !== null && currentTime !== undefined ? edge.properties.validTo > currentTime : false);
   });
 
-  return { 
-    nodes: Array.from(nodeMap.values()), 
-    edges 
+  nodeMap.forEach(node => {
+    if (node.type === 'Quality' && node.properties) {
+      node.properties.isCurrent = node.properties.validTo === null ||
+        (currentTime !== null && currentTime !== undefined ? node.properties.validTo > currentTime : false);
+    }
+  });
+
+  const filteredEdges = showHistory
+    ? edges
+    : edges.filter(e => e.properties.isCurrent !== false);
+
+  const filteredNodes = Array.from(nodeMap.values()).filter(n => {
+    if (showHistory) return true;
+    if (n.type === 'Quality') return n.properties?.isCurrent !== false;
+    return true;
+  });
+
+  return {
+    nodes: filteredNodes,
+    edges: filteredEdges
   };
 }
 
-/**
- * Fallback helper to infer continuant entity class.
- * 
- * @param {string} id - Continuant identifier.
- * @returns {string} Inferred entity class name.
- */
-function inferContinuantClass(id) {
-  if (/^veh/i.test(id)) return 'Vehicle';
-  if (/^slot/i.test(id)) return 'Slot';
-  if (/^ware|^wh/i.test(id)) return 'Warehouse';
-  return 'Part';
-}
-
-/**
- * Capitalises the first letter of a string.
- * @param {string} str 
- * @returns {string}
- */
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);

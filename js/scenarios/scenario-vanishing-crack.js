@@ -1,10 +1,8 @@
 /**
  * SCENARIO: THE VANISHING CRACK
  * -----------------------------
- * Contains narrative subtitle data and the chronological action timeline
+ * Narrative subtitle data and chronological action timeline
  * synchronised with audio playback.
- * 
- * Timestamps are represented in seconds (float).
  */
 
 import {
@@ -13,11 +11,11 @@ import {
   createReportDefectEvent,
   createDismantleEvent
 } from '../smrm/actions.js';
+import { setPerspective } from '../state.js';
 
 /**
  * Highlights specified UI elements by IDs with a temporary glowing effect.
- * Simulates a Phantom User interacting with the workbench controls.
- * 
+ *
  * @param {string[]} elementIds - Array of DOM element IDs to highlight.
  * @param {number} [duration=1200] - Duration of the highlight effect in milliseconds.
  */
@@ -78,162 +76,144 @@ const subtitles = [
 export const vanishingCrackScenario = {
   subtitles,
   timeline: [
-    // 1. t = 1.0: Initialize Naive Node mode, SMRM perspective, and Mermaid engine
+    // 1. t = 1.0: Initialize Naive Node mode, Logical (SMIM) perspective so slot & mounted_in edge are visible
     {
       id: 'step_1_0_init_naive',
       time: 1.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         state.ontology = 'NAIVE_NODE';
-        state.perspective = 'SMRM';
+        setPerspective('SMIM');
         state.graphEngine = 'MERMAID';
       }
     },
 
-    // 2. t = 15.5: highlight UI. Action: createRegisterPartEvent('System_A', time)
+    // 2. t = 15.5: Register Vehicle System_A
     {
       id: 'step_15_5_reg_vehicle',
       time: 15.5,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-reg-id', 'biz-reg-btn']);
         state.currentTime = 15.5;
-        const event = createRegisterPartEvent('System_A', state.currentTime);
-        if (event) {
-          state.eventLog.push(event);
-        }
+        const event = createRegisterPartEvent('System_A', state.currentTime, 'Vehicle');
+        if (event) state.eventLog.push(event);
       }
     },
 
-    // 3. t = 18.0: Audio mentions slot: Simply register Part_M01 and assemble System_A and Part_M01
-    // The smart adapters implicitly generate the contextual slot!
+    // 3. t = 18.0: Register Part_M01 and install in System_A (creates Slot_System_A_Part_M01)
     {
       id: 'step_18_0_reg_part_install',
       time: 18.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-reg-id', 'biz-inst-btn']);
         state.currentTime = 18.0;
-        const regEvent = createRegisterPartEvent('Part_M01', state.currentTime);
-        if (regEvent) {
-          state.eventLog.push(regEvent);
-        }
+        const regEvent = createRegisterPartEvent('Part_M01', state.currentTime, 'Part');
+        if (regEvent) state.eventLog.push(regEvent);
         const asmEvent = createAssembleEvent('System_A', 'Part_M01', 'mounted_in', state.currentTime);
-        if (asmEvent) {
-          state.eventLog.push(asmEvent);
-        }
+        if (asmEvent) state.eventLog.push(asmEvent);
       }
     },
 
-    // 4. t = 43.0: highlight UI. Action: createReportDefectEvent('Part_M01', 'crack', '2mm', time) -> Adapter will attach to NODE
+    // 4. t = 43.0: Report Defect crack=2mm on Part_M01 (attached to NODE)
     {
       id: 'step_43_0_attach_crack_node',
       time: 43.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-def-target', 'biz-def-btn']);
         state.currentTime = 43.0;
         const event = createReportDefectEvent('Part_M01', 'crack', '2mm', state.currentTime);
-        if (event) {
-          state.eventLog.push(event);
-        }
+        if (event) state.eventLog.push(event);
       }
     },
 
-    // 5. t = 56.5: Revoke the defect
+    // 5. t = 56.5: Rewind thought-experiment defect before switching strategy to NAIVE_EDGE
     {
       id: 'step_56_5_revoke_crack_node',
       time: 56.5,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-rev-defect', 'biz-rev-btn']);
         state.currentTime = 56.5;
         const idx = state.eventLog.findIndex(e => e.type === 'REPORT_DEFECT' && e.targetId === 'Part_M01');
-        if (idx !== -1) {
-          state.eventLog.splice(idx, 1);
-        }
+        if (idx !== -1) state.eventLog.splice(idx, 1);
       }
     },
 
-    // 6. t = 58.5: Switch state.ontology = 'NAIVE_EDGE' and highlight top header button
+    // 6. t = 58.5: Switch to NAIVE_EDGE
     {
       id: 'step_58_5_switch_strategy_edge',
       time: 58.5,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['ctrl-onto-naive-edge']);
         state.ontology = 'NAIVE_EDGE';
       }
     },
 
-    // 7. t = 61.0: highlight UI. Action: createReportDefectEvent('Part_M01', 'crack', '2mm', time) -> Adapter attaches to EDGE
+    // 7. t = 61.0: Report Defect crack=2mm on Part_M01 (attached to mounted_in EDGE)
     {
       id: 'step_61_0_attach_crack_edge',
       time: 61.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-def-target', 'biz-def-btn']);
         state.currentTime = 61.0;
         const event = createReportDefectEvent('Part_M01', 'crack', '2mm', state.currentTime);
-        if (event) {
-          state.eventLog.push(event);
-        }
+        if (event) state.eventLog.push(event);
       }
     },
 
-    // 8. t = 78.0: highlight UI. Action: createDismantleEvent('Part_M01', time)
+    // 8. t = 78.0: Dismantle Part_M01
     {
       id: 'step_78_0_dismantle_part',
       time: 78.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-dism-part', 'biz-dism-btn']);
         state.currentTime = 78.0;
         const event = createDismantleEvent('Part_M01', state.currentTime);
-        if (event) {
-          state.eventLog.push(event);
-        }
+        if (event) state.eventLog.push(event);
       }
     },
 
-    // 9. t = 82.0: highlight UI. Action: createRegisterPartEvent('Warehouse_1', time)
+    // 9. t = 82.0: Register Warehouse_1
     {
       id: 'step_82_0_reg_warehouse',
       time: 82.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-reg-id', 'biz-reg-btn']);
         state.currentTime = 82.0;
-        const event = createRegisterPartEvent('Warehouse_1', state.currentTime);
-        if (event) {
-          state.eventLog.push(event);
-        }
+        const event = createRegisterPartEvent('Warehouse_1', state.currentTime, 'Warehouse');
+        if (event) state.eventLog.push(event);
       }
     },
 
-    // 10. t = 84.0: highlight UI. Action: createAssembleEvent('Warehouse_1', 'Part_M01', 'stored_at', time)
+    // 10. t = 84.0: Move Part_M01 to Warehouse_1
     {
       id: 'step_84_0_store_part',
       time: 84.0,
       executed: false,
-      action(state, renderGraph) {
+      action(state) {
         highlightUI(['biz-store-part', 'biz-store-target', 'biz-store-btn']);
         state.currentTime = 84.0;
         const event = createAssembleEvent('Warehouse_1', 'Part_M01', 'stored_at', state.currentTime);
-        if (event) {
-          state.eventLog.push(event);
-        }
+        if (event) state.eventLog.push(event);
       }
     },
 
-    // 11. t = 122.0: highlight UI (ontology switch). Action: state.ontology = 'ISO15926'
+    // 11. t = 122.0: Switch to ISO 15926 (4D) in Logical (SMIM) Perspective
     {
       id: 'step_122_0_switch_iso',
       time: 122.0,
       executed: false,
-      action(state, renderGraph) {
-        highlightUI(['ctrl-onto-iso']);
+      action(state) {
+        highlightUI(['ctrl-onto-iso', 'ctrl-view-logical']);
         state.ontology = 'ISO15926';
+        setPerspective('SMIM');
       }
     }
   ]
@@ -241,18 +221,12 @@ export const vanishingCrackScenario = {
 
 /**
  * Dispatches pending timeline actions based on current playback time.
- * Resolves float chunking using `>= step.time && !step.executed`.
- * 
- * @param {number} currentTime - Current audio playback time in seconds.
- * @param {Object} state - The reactive domain state.
- * @param {Function} [renderGraph] - Function to trigger canvas redraw.
  */
 export function onTimeUpdate(currentTime, state, renderGraph) {
   if (!Array.isArray(vanishingCrackScenario.timeline)) return;
 
   vanishingCrackScenario.timeline.forEach(step => {
     if (currentTime >= step.time && !step.executed) {
-      console.log('Executing step:', step.time);
       step.executed = true;
       const fn = step.action || step.execute;
       if (typeof fn === 'function') {
@@ -267,8 +241,6 @@ export function onTimeUpdate(currentTime, state, renderGraph) {
 
 /**
  * Resets execution flags on timeline steps when seeking, stopping, or rewinding.
- * 
- * @param {number} [targetTime=0] - Audio target time. Steps with step.time >= targetTime are reset to unexecuted.
  */
 export function resetTimeline(targetTime = 0) {
   if (!Array.isArray(vanishingCrackScenario.timeline)) return;

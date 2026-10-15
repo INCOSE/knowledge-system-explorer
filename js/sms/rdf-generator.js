@@ -2,90 +2,65 @@
  * SMS LAYER: RDF GENERATOR
  * ------------------------
  * Simulates how the Semantic Graph is persisted in a W3C RDF Triplestore.
- * Generates pure Turtle (.ttl) serialisation and SPARQL queries.
- * Pure storage generator decoupled from ontologies and presentation markup.
+ * Generates pure Turtle (.ttl) serialisation and ontology-specific temporal SPARQL queries.
  */
+
+import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
 
 /**
  * Generates a W3C RDF Turtle (.ttl) serialisation string from a Semantic Graph.
- * If the graph contains 3D continuant entities, performs autonomous W3C Reification
- * for temporal binary relations. If the graph contains 4D perdurants, serialises
- * standard binary triples for temporal parts and states.
  *
  * @param {Object} semanticGraph - Standardised Semantic Graph with nodes and edges.
  * @returns {string} Pure Turtle (.ttl) serialisation text.
  */
 export function generateRdfStorage(semanticGraph) {
-  if (!semanticGraph) {
-    return '';
+  if (!semanticGraph || !Array.isArray(semanticGraph.nodes) || semanticGraph.nodes.length === 0) {
+    return '# Empty RDF Graph (0 triples)';
   }
 
-  const is4D = semanticGraph.nodes?.some(n => n.type === 'State');
+  const is4D = semanticGraph.nodes.some(n => n.type === 'State' || n.type === 'ActualIndividual');
+  const isBFO = semanticGraph.nodes.some(n => n.type === 'MaterialEntity' || n.type === 'Quality');
   let ttl = '';
 
+  // 1. 4D ISO 15926 Turtle Serialisation
   if (is4D) {
     ttl += `@prefix iso: <http://example.org/iso15926/> .\n`;
     ttl += `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n`;
     ttl += `# 4D Perdurant Graph persisted as Pure Binary RDF Triples\n`;
 
-    const individuals = (semanticGraph.nodes || []).filter(n => n.type === 'ActualIndividual');
+    const individuals = semanticGraph.nodes.filter(n => n.type === 'ActualIndividual');
     individuals.forEach(ind => {
-      ttl += `:${ind.id} a iso:ActualIndividual .\n`;
+      const cls = ind.properties?.entityClass || 'Part';
+      ttl += `:${ind.id} a iso:ActualIndividual , iso:${cls} .\n`;
     });
 
-    const defectNodes = (semanticGraph.nodes || []).filter(n => n.type === 'Defect');
+    const defectNodes = semanticGraph.nodes.filter(n => n.type === 'Defect');
     defectNodes.forEach(d => {
-      ttl += `:${d.id} a iso:DefectClass .\n`;
+      const dType = d.properties?.defectType || 'defect';
+      const dVal = d.properties?.value || 'present';
+      ttl += `:${d.id} a iso:DefectClass ;\n    iso:defectType "${dType}" ;\n    iso:severity "${dVal}" .\n`;
     });
 
-    const states = (semanticGraph.nodes || []).filter(n => n.type === 'State');
+    const states = semanticGraph.nodes.filter(n => n.type === 'State');
     states.forEach(st => {
-      const tpoEdges = (semanticGraph.edges || []).filter(
-        e => e.from === st.id && (e.label === 'temporalPartOf' || e.type === 'classification') && !e.to.startsWith('def')
-      );
-      const partOfEdges = (semanticGraph.edges || []).filter(
-        e => e.from === st.id && (e.label === 'mounted_in' || e.type === 'mounted_in' || e.label === 'partOf')
-      );
-      const hasPartEdges = (semanticGraph.edges || []).filter(
-        e => e.from === st.id && (e.label === 'hasPart' || (e.type === 'composition' && e.label !== 'mounted_in' && e.type !== 'mounted_in'))
-      );
-      const hasSlotEdges = (semanticGraph.edges || []).filter(
-        e => e.from === st.id && (e.label === 'has_slot' || e.type === 'has_slot')
-      );
-      const storedAtEdges = (semanticGraph.edges || []).filter(
-        e => e.from === st.id && (e.label === 'stored_at' || e.type === 'stored_at')
-      );
-      const hasDefectEdges = (semanticGraph.edges || []).filter(
-        e => e.from === st.id && (e.label === 'has_defect' || e.to.startsWith('def'))
-      );
-
+      const outgoing = (semanticGraph.edges || []).filter(e => e.from === st.id);
       const vFrom = st.properties?.validFrom;
       const vTo = st.properties?.validTo;
 
       ttl += `\n:${st.id} a iso:State`;
 
-      tpoEdges.forEach(e => {
-        ttl += ` ;\n    iso:temporalPartOf :${e.to}`;
-      });
-
-      partOfEdges.forEach(e => {
-        ttl += ` ;\n    iso:partOf :${e.to}`;
-      });
-
-      hasPartEdges.forEach(e => {
-        ttl += ` ;\n    iso:hasPart :${e.to}`;
-      });
-
-      hasSlotEdges.forEach(e => {
-        ttl += ` ;\n    iso:hasSlot :${e.to}`;
-      });
-
-      storedAtEdges.forEach(e => {
-        ttl += ` ;\n    iso:storedAt :${e.to}`;
-      });
-
-      hasDefectEdges.forEach(e => {
-        ttl += ` ;\n    iso:hasDefect :${e.to}`;
+      outgoing.forEach(e => {
+        if (e.label === 'temporalPartOf') {
+          ttl += ` ;\n    iso:temporalPartOf :${e.to}`;
+        } else if (e.label === 'mounted_in') {
+          ttl += ` ;\n    iso:mountedIn :${e.to}`;
+        } else if (e.label === 'has_slot') {
+          ttl += ` ;\n    iso:hasSlot :${e.to}`;
+        } else if (e.label === 'stored_at') {
+          ttl += ` ;\n    iso:storedAt :${e.to}`;
+        } else if (e.label === 'has_defect') {
+          ttl += ` ;\n    iso:hasDefect :${e.to}`;
+        }
       });
 
       if (vFrom !== undefined && vFrom !== null) {
@@ -97,134 +72,211 @@ export function generateRdfStorage(semanticGraph) {
 
       ttl += ` .\n`;
     });
-  } else {
-    const domainClasses = ['Vehicle', 'Slot', 'Part', 'Defect', 'Warehouse'];
-    const hasDomainNodes = (semanticGraph.nodes || []).some(n => domainClasses.includes(n.type));
 
-    ttl += `@prefix : <http://example.org/> .\n`;
+    return ttl;
+  }
+
+  // 2. 3D BFO Turtle Serialisation (with W3C Reification)
+  if (isBFO) {
+    ttl += `@prefix : <http://example.org/bfo/> .\n`;
     ttl += `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n`;
+    ttl += `# 3D Continuant Graph persisted via W3C Reification & Quality Inherence\n`;
 
-    if (hasDomainNodes) {
-      ttl += `# Naive Domain Graph persisted as Direct Triples & Properties\n`;
+    semanticGraph.nodes.filter(n => n.type === 'MaterialEntity').forEach(n => {
+      const cls = n.properties?.entityClass || 'Part';
+      ttl += `:${n.id} a :MaterialEntity , :${cls} .\n`;
+    });
 
-      // 1. Domain entities and inline properties
-      (semanticGraph.nodes || []).forEach(n => {
-        ttl += `:${n.id} a :${n.type || 'Part'}`;
-        if (n.properties) {
-          const customProps = Object.entries(n.properties).filter(
-            ([k]) => !['isCurrent', 'originalId', 'entityType', 'validFrom', 'validTo', 'ownerId'].includes(k)
-          );
-          customProps.forEach(([k, v]) => {
-            ttl += ` ;\n    :${k} "${v}"`;
-          });
+    semanticGraph.nodes.filter(n => n.type === 'Quality').forEach(q => {
+      const inh = (semanticGraph.edges || []).find(e => e.from === q.id && e.label === 'inheres_in');
+      const vFrom = q.properties?.validFrom;
+      const vTo = q.properties?.validTo;
+      ttl += `\n:${q.id} a :Quality`;
+      if (q.properties?.qualityType) {
+        ttl += ` ;\n    :qualityType "${q.properties.qualityType}"`;
+      }
+      if (q.properties?.value) {
+        ttl += ` ;\n    :value "${q.properties.value}"`;
+      }
+      if (inh) {
+        ttl += ` ;\n    :inheres_in :${inh.to}`;
+      }
+      if (vFrom !== undefined && vFrom !== null) {
+        ttl += ` ;\n    :validFrom "${vFrom}"^^xsd:integer`;
+      }
+      if (vTo !== undefined && vTo !== null) {
+        ttl += ` ;\n    :validTo   "${vTo}"^^xsd:integer`;
+      }
+      ttl += ` .\n`;
+    });
+
+    (semanticGraph.edges || []).filter(e => e.type !== 'inherence').forEach(edge => {
+      const vFrom = edge.properties?.validFrom;
+      const vTo = edge.properties?.validTo;
+      const rel = edge.label || edge.type;
+      const isChildToParent = rel === 'mounted_in' || rel === 'stored_at';
+      const parentId = isChildToParent ? edge.to : edge.from;
+      const childId = isChildToParent ? edge.from : edge.to;
+
+      ttl += `\n_:${edge.id} a :RelationalQuality ;\n`;
+      ttl += `    :relationType :${rel} ;\n`;
+      ttl += `    :hasParent :${parentId} ;\n`;
+      ttl += `    :hasChild  :${childId}`;
+
+      if (vFrom !== undefined && vFrom !== null) {
+        ttl += ` ;\n    :validFrom "${vFrom}"^^xsd:integer`;
+      }
+      if (vTo !== undefined && vTo !== null) {
+        ttl += ` ;\n    :validTo   "${vTo}"^^xsd:integer`;
+      }
+      ttl += ` .\n`;
+    });
+
+    return ttl;
+  }
+
+  // 3. Naive Graph (Node / Edge) Turtle Serialisation with Reified Edge Properties
+  ttl += `@prefix : <http://example.org/naive/> .\n`;
+  ttl += `@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n`;
+  ttl += `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n`;
+  ttl += `# Naive Domain Graph persisted as RDF Triples & Reified Statements\n`;
+
+  semanticGraph.nodes.forEach(n => {
+    ttl += `:${n.id} a :${n.type || 'Part'}`;
+    if (n.properties) {
+      Object.entries(n.properties).forEach(([k, v]) => {
+        if (!INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null) {
+          ttl += ` ;\n    :${k} "${v}"`;
         }
-        ttl += ` .\n`;
-      });
-
-      // 2. Direct relationships
-      (semanticGraph.edges || []).forEach(edge => {
-        const edgeRel = edge.label || 'has_part';
-        ttl += `:${edge.from} :${edgeRel} :${edge.to} .\n`;
-      });
-    } else {
-      ttl += `# 3D Continuant Graph persisted via W3C Reification & Quality Inherence\n`;
-
-      // 1. Base continuant entities
-      (semanticGraph.nodes || []).filter(n => n.type === 'MaterialEntity').forEach(n => {
-        ttl += `:${n.id} a :MaterialEntity .\n`;
-      });
-
-      // 1b. Dependent Continuants (Quality)
-      (semanticGraph.nodes || []).filter(n => n.type === 'Quality').forEach(q => {
-        ttl += `:${q.id} a :Quality`;
-        const inh = (semanticGraph.edges || []).find(e => e.from === q.id && e.label === 'inheres_in');
-        if (inh) {
-          ttl += ` ;\n    :inheres_in :${inh.to}`;
-        }
-        ttl += ` .\n`;
-      });
-
-      // 2. Synthesise reified statements autonomously for temporal relations
-      (semanticGraph.edges || []).filter(e => e.type !== 'inherence').forEach(edge => {
-        const vFrom = edge.properties?.validFrom;
-        const vTo = edge.properties?.validTo;
-        const rel = edge.label || edge.relationType || edge.type;
-
-        // Respect semantic directionality of predicates:
-        // - mounted_in: Part (from) is mounted in Slot/Vehicle (to) => parent is edge.to, child is edge.from
-        // - has_slot / has_part / composition: parent is edge.from, child is edge.to
-        const isMountedIn = rel === 'mounted_in';
-        const parentId = isMountedIn ? edge.to : edge.from;
-        const childId = isMountedIn ? edge.from : edge.to;
-
-        ttl += `\n_:${edge.id} a :RelationalQuality ;\n`;
-        ttl += `    :hasParent :${parentId} ;\n`;
-        ttl += `    :hasChild  :${childId}`;
-
-        if (vFrom !== undefined && vFrom !== null) {
-          ttl += ` ;\n    :validFrom "${vFrom}"^^xsd:integer`;
-        }
-        if (vTo !== undefined && vTo !== null) {
-          ttl += ` ;\n    :validTo   "${vTo}"^^xsd:integer`;
-        }
-
-        ttl += ` .\n`;
       });
     }
-  }
+    ttl += ` .\n`;
+  });
+
+  (semanticGraph.edges || []).forEach(edge => {
+    const edgeRel = edge.label || 'has_part';
+    const vFrom = edge.properties?.validFrom;
+    const vTo = edge.properties?.validTo;
+
+    // Emit direct triple if currently active
+    if (edge.properties?.isCurrent !== false) {
+      ttl += `\n:${edge.from} :${edgeRel} :${edge.to} .\n`;
+    }
+
+    // Emit W3C Statement reification to hold validFrom/validTo and edge-attached defects
+    ttl += `_:${edge.id} a rdf:Statement ;\n`;
+    ttl += `    rdf:subject   :${edge.from} ;\n`;
+    ttl += `    rdf:predicate :${edgeRel} ;\n`;
+    ttl += `    rdf:object    :${edge.to}`;
+
+    if (vFrom !== undefined && vFrom !== null) {
+      ttl += ` ;\n    :validFrom "${vFrom}"^^xsd:integer`;
+    }
+    if (vTo !== undefined && vTo !== null) {
+      ttl += ` ;\n    :validTo   "${vTo}"^^xsd:integer`;
+    }
+    if (edge.properties) {
+      Object.entries(edge.properties).forEach(([k, v]) => {
+        if (!INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null) {
+          ttl += ` ;\n    :${k} "${v}"`;
+        }
+      });
+    }
+    ttl += ` .\n`;
+  });
 
   return ttl;
 }
 
 /**
- * Generates a SPARQL query for the specified Semantic Graph at the given point in time.
+ * Generates an ontology-aware temporal SPARQL query for time T.
  *
- * @param {Object} semanticGraph - Standardised Semantic Graph with nodes and edges.
- * @param {number} currentTime - Current discrete time step.
+ * @param {Object} semanticGraph - Standardised Semantic Graph.
+ * @param {number} currentTime - Current discrete timestamp T.
+ * @param {string} [ontology='NAIVE_NODE'] - Active ontology identifier.
  * @returns {string} SPARQL query string.
  */
-export function generateRdfQuery(semanticGraph, currentTime) {
-  const is4D = semanticGraph?.nodes?.some(n => n.type === 'State');
+export function generateRdfQuery(semanticGraph, currentTime = 0, ontology = 'NAIVE_NODE') {
+  const t = currentTime ?? 0;
+  const is4D = ontology === 'ISO15926' || semanticGraph?.nodes?.some(n => n.type === 'State');
+  const isBFO = ontology === 'BFO' || semanticGraph?.nodes?.some(n => n.type === 'MaterialEntity');
 
   if (is4D) {
-    return `# SPARQL (W3C RDF) - 4D Perdurant Full Graph Topology
+    return `# SPARQL (W3C RDF) — ISO 15926 (4D) State & Defect Audit at T = ${t}
 PREFIX iso: <http://example.org/iso15926/>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT ?subject ?predicate ?object
+SELECT ?part ?location ?defectType ?severity
 WHERE {
-  ?subject ?predicate ?object .
+  ?st iso:temporalPartOf ?part ;
+      iso:mountedIn|iso:storedAt ?locState ;
+      iso:validFrom ?vf .
+  ?locState iso:temporalPartOf ?location .
+  OPTIONAL { ?st iso:validTo ?vt }
+  FILTER (?vf <= ${t} && (!BOUND(?vt) || ?vt > ${t}))
+
+  OPTIONAL {
+    ?defState iso:temporalPartOf ?part ;
+              iso:hasDefect ?def .
+    ?def iso:defectType ?defectType ;
+         iso:severity ?severity .
+  }
 }`;
   }
 
-  const hasQuality = semanticGraph?.nodes?.some(n => n.type === 'Quality');
-  if (hasQuality) {
-    return `# SPARQL (W3C RDF) - 3D BFO Full Graph Topology & Inherence
-PREFIX : <http://example.org/>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT ?subject ?predicate ?object
+  if (isBFO) {
+    return `# SPARQL (W3C RDF) — BFO (3D) Reified Placement & Quality at T = ${t}
+PREFIX : <http://example.org/bfo/>
+SELECT ?part ?location ?qualityType ?value
 WHERE {
-  ?subject ?predicate ?object .
+  ?stmt a :RelationalQuality ;
+        :hasChild ?part ;
+        :hasParent ?location ;
+        :validFrom ?vf .
+  OPTIONAL { ?stmt :validTo ?vt }
+  FILTER (?vf <= ${t} && (!BOUND(?vt) || ?vt > ${t}))
+
+  OPTIONAL {
+    ?qual a :Quality ;
+          :inheres_in ?part ;
+          :qualityType ?qualityType ;
+          :value ?value ;
+          :validFrom ?qvf .
+    OPTIONAL { ?qual :validTo ?qvt }
+    FILTER (?qvf <= ${t} && (!BOUND(?qvt) || ?qvt > ${t}))
+  }
 }`;
   }
 
-  const domainClasses = ['Vehicle', 'Slot', 'Part', 'Defect', 'Warehouse'];
-  const hasDomainNodes = (semanticGraph?.nodes || []).some(n => domainClasses.includes(n.type));
-
-  if (hasDomainNodes) {
-    return `# SPARQL (W3C RDF) - Domain Graph Full Topology & Properties
-PREFIX : <http://example.org/>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT ?subject ?predicate ?object
+  if (ontology === 'NAIVE_EDGE') {
+    return `# SPARQL (W3C RDF) — Naive Graph (Edge) Reified Statement Query at T = ${t}
+# WARNING: Reads :crack from active placement statement ?stmt!
+PREFIX : <http://example.org/naive/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+SELECT ?part ?location ?crack
 WHERE {
-  ?subject ?predicate ?object .
+  ?stmt a rdf:Statement ;
+        rdf:subject ?part ;
+        rdf:predicate ?pred ;
+        rdf:object ?location ;
+        :validFrom ?vf .
+  OPTIONAL { ?stmt :validTo ?vt }
+  OPTIONAL { ?stmt :crack ?crack }
+  FILTER (?pred IN (:mounted_in, :stored_at))
+  FILTER (?vf <= ${t} && (!BOUND(?vt) || ?vt > ${t}))
 }`;
   }
 
-  return `# SPARQL (W3C RDF) - Full Graph Topology
-PREFIX : <http://example.org/>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT ?subject ?predicate ?object
+  return `# SPARQL (W3C RDF) — Naive Graph (Node) Query at T = ${t}
+# WARNING: :crack is attached directly to ?part without temporal bounds!
+PREFIX : <http://example.org/naive/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+SELECT ?part ?location ?crack
 WHERE {
-  ?subject ?predicate ?object .
+  ?stmt a rdf:Statement ;
+        rdf:subject ?part ;
+        rdf:object ?location ;
+        :validFrom ?vf .
+  OPTIONAL { ?stmt :validTo ?vt }
+  OPTIONAL { ?part :crack ?crack }
+  FILTER (?vf <= ${t} && (!BOUND(?vt) || ?vt > ${t}))
 }`;
 }

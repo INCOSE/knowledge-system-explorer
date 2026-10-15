@@ -2,26 +2,31 @@
  * ISO 15926 ONTOLOGY ADAPTER (4D Perdurant)
  * -----------------------------------------
  * Maps Domain Business Events into a canonical 4D ISO 15926 Semantic Graph.
- * 
+ *
  * Ontological Axioms:
- * - Physical entities (Vehicle, Part, Warehouse) are 4D individuals ('ActualIndividual')
+ * - Physical entities (Vehicle, Part, Warehouse, Slot) are 4D individuals ('ActualIndividual')
  *   with spatio-temporal extents across their entire lifetime.
- * - Relationships (mounted_in, stored_at, etc.) do not connect 4D extents directly;
- *   they connect temporal slices ('State') of those entities during specific validity periods.
- * - Each 'State' is linked to its whole 4D extent via the 'temporalPartOf' relation.
- * - A 'Defect' is an independent condition/classification entity that classifies a specific
- *   temporal part ('State') of an entity during a specific time slice, NOT the root 4D individual.
- * 
- * @param {Array} eventLog - The projection of temporal business events.
- * @param {Array} [baseNodes=[]] - The projection of base entities.
- * @param {number|null} [currentTime=null] - Global time to evaluate current validity.
- * @returns {{ nodes: Array, edges: Array }} The canonical Semantic Graph.
+ * - Relationships connect temporal slices ('State') of those entities during specific validity periods.
+ * - Each 'State' is linked to its 4D extent via 'temporalPartOf'.
+ * - A 'Defect' classifies the temporal 'State' of the entity.
  */
 
-export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime = null) {
+import { inferEntityClass } from '../smrm/definitions.js';
+
+/**
+ * Generates the 4D ISO 15926 Semantic Graph from the event log up to currentTime.
+ *
+ * @param {Array} eventLog - Temporal business events.
+ * @param {Array} [baseNodes=[]] - Initial base entities.
+ * @param {number|null} [currentTime=null] - Global evaluation time T.
+ * @param {Object} [options={}] - { showHistory: boolean }.
+ * @returns {{ nodes: Array, edges: Array }}
+ */
+export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime = null, options = {}) {
   const nodeMap = new Map();
   const edges = [];
   const stateNodesByOwner = new Map();
+  const showHistory = options.showHistory !== undefined ? Boolean(options.showHistory) : true;
 
   function registerStateNode(ownerId, stateNode) {
     if (!stateNodesByOwner.has(ownerId)) {
@@ -33,22 +38,23 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
   function ensureExtentNode(partId, overrideClass = null) {
     const extentId = `4d_${partId}`;
     if (!nodeMap.has(extentId)) {
+      const entityClass = inferEntityClass(partId, overrideClass);
       nodeMap.set(extentId, {
         id: extentId,
         label: `${partId}_4D`,
         type: 'ActualIndividual',
         properties: {
           originalId: partId,
-          entityClass: overrideClass || inferEntityType(partId)
+          entityClass
         }
       });
     }
     return extentId;
   }
 
-  // 1. Initialise base 4D extent nodes (if provided)
+  // 1. Initialise base 4D extent nodes
   (baseNodes || []).forEach(bn => {
-    ensureExtentNode(bn.id);
+    ensureExtentNode(bn.id, bn.entityClass || bn.type);
   });
 
   // 2. Filter and sort business events by timestamp
@@ -57,12 +63,11 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
     .slice()
     .sort((a, b) => (a.valid_from || 0) - (b.valid_from || 0));
 
-
   // 3. Process business events in temporal order
   eventsToProcess.forEach(event => {
     switch (event.type) {
       case 'REGISTER_PART': {
-        ensureExtentNode(event.partId);
+        ensureExtentNode(event.partId, event.entityClass);
         break;
       }
 
@@ -123,12 +128,14 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
             type: 'composition',
             childId,
             parentId,
+            childStateId,
+            parentStateId,
             properties: { validFrom: timestamp, validTo: null, isCurrent: true }
           });
           break;
         }
 
-        // Implicit contextual Slot generation: Slot_${parentId}_${childId}
+        // Contextual Slot generation: Slot_${parentId}_${childId}
         const slotId = `Slot_${parentId}_${childId}`;
         const slotExtentId = ensureExtentNode(slotId, 'Slot');
 
@@ -140,12 +147,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           id: parentStateId,
           label: `${parentId}_State`,
           type: 'State',
-          properties: {
-            ownerId: parentId,
-            validFrom: timestamp,
-            validTo: null,
-            isCurrent: true
-          }
+          properties: { ownerId: parentId, validFrom: timestamp, validTo: null, isCurrent: true }
         };
         nodeMap.set(parentStateId, parentState);
         registerStateNode(parentId, parentState);
@@ -154,12 +156,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           id: slotStateId,
           label: `${slotId}_State`,
           type: 'State',
-          properties: {
-            ownerId: slotId,
-            validFrom: timestamp,
-            validTo: null,
-            isCurrent: true
-          }
+          properties: { ownerId: slotId, validFrom: timestamp, validTo: null, isCurrent: true }
         };
         nodeMap.set(slotStateId, slotState);
         registerStateNode(slotId, slotState);
@@ -168,17 +165,11 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           id: childStateId,
           label: `${childId}_State`,
           type: 'State',
-          properties: {
-            ownerId: childId,
-            validFrom: timestamp,
-            validTo: null,
-            isCurrent: true
-          }
+          properties: { ownerId: childId, validFrom: timestamp, validTo: null, isCurrent: true }
         };
         nodeMap.set(childStateId, childState);
         registerStateNode(childId, childState);
 
-        // Link temporal states to their 4D extents
         edges.push({
           id: `tpo_${parentStateId}`,
           from: parentStateId,
@@ -215,14 +206,10 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           label: 'has_slot',
           type: 'has_slot',
           childId: slotId,
-          parentId: parentId,
+          parentId,
           childStateId: slotStateId,
-          parentStateId: parentStateId,
-          properties: {
-            validFrom: timestamp,
-            validTo: null,
-            isCurrent: true
-          }
+          parentStateId,
+          properties: { validFrom: timestamp, validTo: null, isCurrent: true }
         });
 
         // Link 2: Child State -> Slot State (mounted_in)
@@ -237,11 +224,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           parentId: slotId,
           childStateId,
           parentStateId: slotStateId,
-          properties: {
-            validFrom: timestamp,
-            validTo: null,
-            isCurrent: true
-          }
+          properties: { validFrom: timestamp, validTo: null, isCurrent: true }
         });
         break;
       }
@@ -250,7 +233,6 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         const { childId } = event;
         const dismantleTime = event.valid_from;
 
-        // Find active assembly or storage edge for this child
         const activeAssembly = edges.find(
           e => (e.childId === childId || e.from.startsWith(`st_${childId}_`)) &&
                (e.label === 'mounted_in' || e.label === 'stored_at') &&
@@ -258,25 +240,43 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         );
         if (activeAssembly) {
           activeAssembly.properties.validTo = dismantleTime;
-          activeAssembly.properties.isCurrent = (currentTime !== null && currentTime !== undefined)
-            ? dismantleTime > currentTime
-            : false;
 
-          // Close the child state slice
+          // Close child state slice and its temporalPartOf link
           const childState = nodeMap.get(activeAssembly.childStateId);
           if (childState) {
             childState.properties.validTo = dismantleTime;
-            childState.properties.isCurrent = activeAssembly.properties.isCurrent;
           }
-
-          // Close the child's temporalPartOf link
           const tpoChild = edges.find(e => e.id === `tpo_${activeAssembly.childStateId}`);
           if (tpoChild) {
             tpoChild.properties.validTo = dismantleTime;
-            tpoChild.properties.isCurrent = activeAssembly.properties.isCurrent;
           }
-        } else {
-          console.warn(`[SMIM ISO15926] No active assembly found to dismantle child part: ${childId}`);
+
+          // Close contextual slot state, its has_slot edge, and the parent state slice
+          const slotStateId = activeAssembly.parentStateId;
+          if (slotStateId && slotStateId.startsWith('st_Slot_')) {
+            const slotState = nodeMap.get(slotStateId);
+            if (slotState) {
+              slotState.properties.validTo = dismantleTime;
+            }
+            const tpoSlot = edges.find(e => e.id === `tpo_${slotStateId}`);
+            if (tpoSlot) {
+              tpoSlot.properties.validTo = dismantleTime;
+            }
+            const hasSlotEdge = edges.find(
+              e => e.to === slotStateId && e.label === 'has_slot' && e.properties.validTo === null
+            );
+            if (hasSlotEdge) {
+              hasSlotEdge.properties.validTo = dismantleTime;
+              const parentState = nodeMap.get(hasSlotEdge.parentStateId);
+              if (parentState) {
+                parentState.properties.validTo = dismantleTime;
+              }
+              const tpoParent = edges.find(e => e.id === `tpo_${hasSlotEdge.parentStateId}`);
+              if (tpoParent) {
+                tpoParent.properties.validTo = dismantleTime;
+              }
+            }
+          }
         }
         break;
       }
@@ -287,9 +287,8 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
 
         const targetExtentId = ensureExtentNode(targetId);
 
-        // Find current active State of the target part
         const existingStates = stateNodesByOwner.get(targetId) || [];
-        let targetState = existingStates.find(st => st.properties?.isCurrent && st.properties?.validTo === null) ||
+        let targetState = existingStates.find(st => st.properties?.validTo === null) ||
           existingStates[existingStates.length - 1];
 
         if (!targetState) {
@@ -331,7 +330,9 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
             value: defectValue,
             targetId,
             entityClass: 'Defect',
-            validFrom: timestamp
+            validFrom: timestamp,
+            validTo: null,
+            isCurrent: true
           }
         });
 
@@ -345,9 +346,26 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           properties: {
             validFrom: timestamp,
             validTo: null,
-            isCurrent: targetState.properties.isCurrent
+            isCurrent: true
           }
         });
+        break;
+      }
+
+      case 'REVOKE_DEFECT': {
+        const { targetId, defectName } = event;
+        const revokeTime = event.valid_from;
+        const defectNodeId = `def_${targetId}_${defectName}`;
+
+        edges.forEach(e => {
+          if (e.to === defectNodeId && e.label === 'has_defect' && e.properties.validTo === null) {
+            e.properties.validTo = revokeTime;
+          }
+        });
+        const dNode = nodeMap.get(defectNodeId);
+        if (dNode && dNode.properties) {
+          dNode.properties.validTo = revokeTime;
+        }
         break;
       }
 
@@ -356,37 +374,40 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
     }
   });
 
-  // 4. Synchronise final temporal currentness flags
-  edges.forEach(edge => {
-    edge.properties.isCurrent = edge.properties.validTo === null || 
-      (currentTime !== null && currentTime !== undefined ? edge.properties.validTo > currentTime : false);
+  // 4. Synchronise final temporal currentness flags across States, Defects, and Edges
+  const isTimeActive = (validTo) =>
+    validTo === null || validTo === undefined ||
+    (currentTime !== null && currentTime !== undefined ? validTo > currentTime : false);
+
+  nodeMap.forEach(node => {
+    if ((node.type === 'State' || node.type === 'Defect') && node.properties) {
+      node.properties.isCurrent = isTimeActive(node.properties.validTo);
+    }
   });
 
-  return { 
-    nodes: Array.from(nodeMap.values()), 
-    edges 
+  edges.forEach(edge => {
+    edge.properties.isCurrent = isTimeActive(edge.properties.validTo);
+  });
+
+  if (!showHistory) {
+    const activeEdges = edges.filter(e => e.properties.isCurrent !== false);
+    const activeNodeIds = new Set();
+    activeEdges.forEach(e => {
+      activeNodeIds.add(e.from);
+      activeNodeIds.add(e.to);
+    });
+    const activeNodes = Array.from(nodeMap.values()).filter(
+      n => n.type === 'ActualIndividual' || n.properties?.isCurrent !== false || activeNodeIds.has(n.id)
+    );
+    return { nodes: activeNodes, edges: activeEdges };
+  }
+
+  return {
+    nodes: Array.from(nodeMap.values()),
+    edges
   };
 }
 
-/**
- * Fallback helper to infer entity type from common identifier naming conventions.
- * 
- * @param {string} id - Node identifier.
- * @returns {string} Inferred entity class name.
- */
-function inferEntityType(id) {
-  if (/^veh/i.test(id)) return 'Vehicle';
-  if (/^slot/i.test(id)) return 'Slot';
-  if (/^def/i.test(id)) return 'Defect';
-  if (/^ware|^wh/i.test(id)) return 'Warehouse';
-  return 'Part';
-}
-
-/**
- * Capitalises the first letter of a string.
- * @param {string} str 
- * @returns {string}
- */
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
