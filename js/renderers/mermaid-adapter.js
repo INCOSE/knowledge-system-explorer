@@ -3,6 +3,7 @@
  * ------------------------
  * Translates the abstract Semantic Graph into Mermaid flowchart syntax
  * and renders it to the DOM without leaking internal metadata properties.
+ * Now includes Pan & Zoom support and ELK layout engine for better readability.
  */
 
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
@@ -10,6 +11,7 @@ import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
 let isRendering = false;
 let pendingDefinition = null;
 let renderCounter = 0;
+let panZoomInstance = null; // Store the pan-zoom instance
 
 /**
  * Updates the Mermaid graph in the specified container.
@@ -21,6 +23,11 @@ export async function updateMermaidNetwork(semanticGraph, container) {
   if (!container) return;
 
   if (!semanticGraph || !Array.isArray(semanticGraph.nodes) || semanticGraph.nodes.length === 0) {
+    // Destroy pan-zoom if the graph is empty
+    if (panZoomInstance) {
+        panZoomInstance.destroy();
+        panZoomInstance = null;
+    }
     container.innerHTML = `<div style="margin: auto; color: #94a3b8; font-size: 13px; font-weight: 500;">Empty Graph Canvas (T = 0)</div>`;
     return;
   }
@@ -39,8 +46,36 @@ async function executeRender(definition, container) {
   isRendering = true;
   try {
     const renderId = 'mermaid_svg_' + (++renderCounter);
+    
+    // 1. Render the SVG using Mermaid
     const { svg } = await mermaid.render(renderId, definition);
     container.innerHTML = svg;
+    
+    // 2. Destroy the previous pan-zoom instance to prevent memory leaks
+    if (panZoomInstance) {
+        panZoomInstance.destroy();
+        panZoomInstance = null;
+    }
+
+    // 3. Initialize svg-pan-zoom on the newly created SVG element
+    const svgElement = container.querySelector('svg');
+    if (svgElement && window.svgPanZoom) {
+        // Ensure the SVG takes up the full container for panning/zooming to work properly
+        svgElement.style.width = '100%';
+        svgElement.style.height = '100%';
+        // Remove max-width constraint set by mermaid
+        svgElement.style.maxWidth = 'none';
+
+        panZoomInstance = svgPanZoom(svgElement, {
+            zoomEnabled: true,
+            controlIconsEnabled: true, // Show +/-/reset buttons
+            fit: true,
+            center: true,
+            minZoom: 0.1,
+            maxZoom: 10
+        });
+    }
+
   } catch (err) {
     console.error('[Mermaid Adapter] Render Error:', err);
   } finally {
@@ -60,7 +95,8 @@ async function executeRender(definition, container) {
  * @returns {string} Mermaid chart definition string.
  */
 function buildMermaidDefinition(semanticGraph) {
-  let def = 'flowchart TD\n';
+  // Use ELK layout for better graph density and set flow to Top-Down (TD)
+  let def = `%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%\nflowchart TD\n`;
   def += '  classDef default fill:#f8fafc,stroke:#cbd5e1,color:#334155,stroke-width:1px\n';
   def += '  classDef bfoSys fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
   def += '  classDef bfoElem fill:#64748b,stroke:#475569,color:#ffffff,stroke-width:1px\n';

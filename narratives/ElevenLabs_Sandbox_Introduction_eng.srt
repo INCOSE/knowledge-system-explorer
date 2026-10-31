@@ -1,0 +1,163 @@
+1
+00:00:00,140 --> 00:00:02,520
+Welcome to the Knowledge Architecture
+Workbench.
+
+2
+00:00:03,360 --> 00:00:08,160
+Every day, engineers ask seemingly simple
+questions about complex products.
+
+3
+00:00:08,880 --> 00:00:12,860
+Which exact component was installed in
+this vehicle when a failure occurred?
+
+4
+00:00:13,660 --> 00:00:18,300
+Yet, before a real-world question can
+become useful knowledge, data must pass
+
+5
+00:00:18,300 --> 00:00:23,640
+through several architectural layers, from
+domain concepts and formal logic down to
+
+6
+00:00:23,640 --> 00:00:25,100
+physical database tables.
+
+7
+00:00:25,820 --> 00:00:30,120
+This interactive tool demonstrates how
+different graph technologies handle that
+
+8
+00:00:30,120 --> 00:00:34,480
+journey, exposing the hidden traps in
+designing knowledge management systems.
+
+9
+00:00:35,200 --> 00:00:38,940
+You can explore pre-recorded edge cases,
+like this guided tour,
+
+10
+00:00:39,540 --> 00:00:44,460
+or use the open sandbox to build your own
+structures and switch storage modes on the fly.
+
+11
+00:00:47,140 --> 00:00:48,780
+Let's see the sandbox in action.
+
+12
+00:00:49,560 --> 00:00:53,220
+Using the operations toolbar, we act as
+the domain engineer.
+
+13
+00:00:54,880 --> 00:01:00,280
+Let's install a new component, Pump_B,
+into System_A.
+
+14
+00:01:01,380 --> 00:01:04,040
+Look at the BOM tree structure on the top
+right.
+
+15
+00:01:04,720 --> 00:01:10,600
+Regardless of the underlying database, the engineer's 
+viewpoint remains a clean, familiar hierarchy.
+
+16
+00:01:13,300 --> 00:01:20,220
+Now, let's advance the clock to T equals 1
+and report a 2 millimeter crack on Part_A.
+
+17
+00:01:21,640 --> 00:01:22,540
+Watch the canvas.
+
+18
+00:01:23,200 --> 00:01:28,740
+In this naive graph mode, where we model
+data without strict ontological rules, the
+
+19
+00:01:28,740 --> 00:01:33,300
+defect simply overwrites the node's
+label, destroying its prior history.
+
+20
+00:01:34,500 --> 00:01:40,940
+If we now ask what Part_A looked like at T
+equals 0, the database will falsely claim
+
+21
+00:01:40,940 --> 00:01:42,240
+it was born defective.
+
+22
+00:01:44,660 --> 00:01:49,940
+Let's step forward to T equals 2 and
+dismantle the broken Part_A.
+
+23
+00:01:51,960 --> 00:01:56,880
+Now, let's pull the architectural levers
+at the top left without losing our history.
+
+24
+00:01:57,900 --> 00:01:59,380
+Switching to BFO,
+
+25
+00:02:00,000 --> 00:02:05,240
+3D continuance, keeps the physical part
+unchanged through time, attaching the
+
+26
+00:02:05,240 --> 00:02:07,720
+crack as a separate dependent quality
+node.
+
+27
+00:02:10,199 --> 00:02:18,380
+Switching to ISO 15926, 4D extents, treats
+objects as spatiotemporal worms.
+
+28
+00:02:20,000 --> 00:02:26,140
+Notice how the crack at T equals 1 forced
+the system to slice both Part_A and
+
+29
+00:02:26,140 --> 00:02:33,220
+System_A into new immutable temporal
+states, preserving a mathematically pristine audit trail.
+
+30
+00:02:35,560 --> 00:02:42,480
+Finally, look at the bottom right panels
+as we toggle between LPG and W3CRDF.
+
+31
+00:02:44,400 --> 00:02:50,460
+Under the Bonnet translates our live graph
+into raw database tables, or RDF triples,
+
+32
+00:02:50,460 --> 00:02:56,440
+in real time, while Database Query
+reveals the exact Cypher or SPARQL code
+
+33
+00:02:56,440 --> 00:02:58,860
+required to extract knowledge at time T.
+
+34
+00:02:59,840 --> 00:03:05,600
+Feel free to replay any step, load another
+scenario, or experiment with the controls yourself.

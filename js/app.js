@@ -34,9 +34,14 @@ import { generateRdfStorage, generateRdfQuery } from './sms/rdf-generator.js';
 import { generatePhysicalGraph } from './sms/sms-graph-generator.js';
 import {
   vanishingCrackScenario,
-  onTimeUpdate as dispatchScenarioTimeline,
-  resetTimeline
+  onTimeUpdate as dispatchVanishingCrackTimeline,
+  resetTimeline as resetVanishingCrackTimeline
 } from './scenarios/scenario-vanishing-crack.js';
+import {
+  sandboxTourScenario,
+  onSandboxTourTimeUpdate,
+  resetSandboxTourTimeline
+} from './scenarios/scenario-sandbox-tour.js';
 
 /**
  * RECURSIVE BOM TREE NODE COMPONENT
@@ -97,13 +102,26 @@ const App = {
     const bizStorePart = ref('');
     const bizStoreTarget = ref('');
 
-    // Scenario Player State
+    // Scenario Player State (Supports multiple scenarios + virtual fallback timer)
+    const activeScenarioId = ref('VANISHING_CRACK'); // 'SANDBOX_TOUR' | 'VANISHING_CRACK'
     const scenarioAudio = ref(null);
     const isPlaying = ref(false);
     const audioCurrentTime = ref(0);
     const audioDuration = ref(0);
     const showSubtitles = ref(true);
     const currentSubtitleText = ref('');
+    let virtualTimerInterval = null;
+    const usingVirtualTimer = ref(false);
+
+    const activeScenarioObj = computed(() =>
+      activeScenarioId.value === 'SANDBOX_TOUR' ? sandboxTourScenario : vanishingCrackScenario
+    );
+
+    const activeAudioSrc = computed(() =>
+      activeScenarioId.value === 'SANDBOX_TOUR'
+        ? './narratives/Ontologies_-_Sandbox_Tour.mp3'
+        : './narratives/Ontologies_-_Disappearing_Crack.mp3'
+    );
 
     // Layout State (Flex percentages for resizers)
     const layout = reactive({ leftWidth: 64, bomHeight: 24, storageHeight: 42 });
@@ -350,7 +368,6 @@ const App = {
       const edges = [];
       const dict = t.value.legend;
 
-      // In Engineer (SMRM) Perspective or Naive ontologies, domain entities are shown
       if (state.perspective === 'SMRM' || state.ontology === 'NAIVE_NODE' || state.ontology === 'NAIVE_EDGE') {
         nodes.push({ id: 'naiveVehicle', label: dict.naiveVehicle, swatch: 'swatch-box-vehicle' });
         if (state.perspective !== 'SMRM') {
@@ -389,7 +406,6 @@ const App = {
           }
         }
       } else {
-        // ISO 15926 (4D) in SMIM / SMS_LPG / SMS_RDF
         nodes.push({ id: 'iso4d', label: dict.iso4d, swatch: 'swatch-box-4d' });
         nodes.push({ id: 'isoState', label: dict.isoState, swatch: 'swatch-box-state' });
         nodes.push({ id: 'isoDefect', label: dict.isoDefect, swatch: 'swatch-diamond-defect' });
@@ -438,19 +454,43 @@ const App = {
       dispatch(createRegisterPartEvent('Warehouse_1', 0, 'Warehouse', nextSequence()));
     }
 
+    function resetActiveScenarioState() {
+      state.userRole = 'UNI_ENGINEER';
+      state.eventLog.splice(0, state.eventLog.length);
+      state.currentTime = 0;
+      state.ontology = 'NAIVE_NODE';
+
+      if (activeScenarioId.value === 'SANDBOX_TOUR') {
+        resetSandboxTourTimeline(0);
+        setPerspective('SMRM');
+        state.graphEngine = 'VIS';
+        audioDuration.value = sandboxTourScenario.fallbackDuration;
+        onSandboxTourTimeUpdate(0, state, renderGraph);
+      } else {
+        resetVanishingCrackTimeline(0);
+        setPerspective('SMIM');
+        state.graphEngine = 'MERMAID';
+      }
+    }
+
+    function launchScenario(scenarioId) {
+      activeScenarioId.value = scenarioId;
+      stopAudio(false);
+      if ( state.currentView === 'SCENARIO' ) {
+        resetActiveScenarioState();
+        nextTick(() => renderGraph());
+      } else {
+        state.currentView = 'SCENARIO';
+      }
+    }
+
     // Watch for view transitions (MENU vs SANDBOX vs SCENARIO)
     watch(() => state.currentView, async (newView) => {
       if (newView !== 'SCENARIO') {
         stopAudio(false);
       }
       if (newView === 'SCENARIO') {
-        state.userRole = 'UNI_ENGINEER';
-        state.eventLog.splice(0, state.eventLog.length);
-        resetTimeline(0);
-        state.currentTime = 0;
-        state.ontology = 'NAIVE_NODE';
-        setPerspective('SMIM');
-        state.graphEngine = 'MERMAID';
+        resetActiveScenarioState();
       } else if (newView === 'SANDBOX' && state.eventLog.length === 0) {
         seedInitialSandboxData();
       }
@@ -471,6 +511,31 @@ const App = {
       }
     });
 
+    function clearVirtualTimer() {
+      if (virtualTimerInterval) {
+        clearInterval(virtualTimerInterval);
+        virtualTimerInterval = null;
+      }
+    }
+
+    function startVirtualTimer() {
+      clearVirtualTimer();
+      usingVirtualTimer.value = true;
+      isPlaying.value = true;
+      if (!audioDuration.value) {
+        audioDuration.value = activeScenarioObj.value.fallbackDuration || 108;
+      }
+      virtualTimerInterval = setInterval(() => {
+        if (audioCurrentTime.value < audioDuration.value) {
+          audioCurrentTime.value = Math.min(audioDuration.value, audioCurrentTime.value + 0.25);
+          processTimelineAt(audioCurrentTime.value);
+        } else {
+          clearVirtualTimer();
+          onAudioEnded();
+        }
+      }, 250);
+    }
+
     function goHome() {
       stopAudio(false);
       state.currentView = 'MENU';
@@ -480,15 +545,24 @@ const App = {
     }
 
     function playAudio() {
+      if (usingVirtualTimer.value) {
+        startVirtualTimer();
+        return;
+      }
       if (scenarioAudio.value) {
-        scenarioAudio.value.play().catch(err => {
-          console.warn('Audio playback was prevented or failed:', err);
+        scenarioAudio.value.play().catch(() => {
+          // If MP3 file is not recorded yet, seamlessly fall back to virtual timer
+          startVirtualTimer();
         });
+      } else {
+        startVirtualTimer();
       }
     }
 
     function pauseAudio() {
-      if (scenarioAudio.value) {
+      clearVirtualTimer();
+      isPlaying.value = false;
+      if (scenarioAudio.value && !usingVirtualTimer.value) {
         scenarioAudio.value.pause();
       }
     }
@@ -502,6 +576,8 @@ const App = {
     }
 
     function stopAudio(resetScenarioGraph = true) {
+      clearVirtualTimer();
+      usingVirtualTimer.value = false;
       if (scenarioAudio.value) {
         scenarioAudio.value.pause();
         scenarioAudio.value.currentTime = 0;
@@ -509,60 +585,60 @@ const App = {
       isPlaying.value = false;
       audioCurrentTime.value = 0;
       currentSubtitleText.value = '';
+      resetSandboxTourTimeline(0);
 
       if (resetScenarioGraph) {
-        state.eventLog.splice(0, state.eventLog.length);
-        resetTimeline(0);
-        state.currentTime = 0;
-        state.ontology = 'NAIVE_NODE';
-        setPerspective('SMIM');
-        state.graphEngine = 'MERMAID';
+        resetActiveScenarioState();
         nextTick(() => {
           renderGraph();
         });
       }
     }
 
-    function onTimeUpdate() {
-      if (scenarioAudio.value) {
-        audioCurrentTime.value = scenarioAudio.value.currentTime;
-      }
-      const currentTime = audioCurrentTime.value;
-
-      const activeSubtitle = vanishingCrackScenario.subtitles.find(
+    function processTimelineAt(currentTime) {
+      const scenario = activeScenarioObj.value;
+      const activeSubtitle = scenario.subtitles.find(
         sub => currentTime >= sub.start && currentTime <= sub.end
       );
       currentSubtitleText.value = activeSubtitle ? activeSubtitle.text : '';
 
-      dispatchScenarioTimeline(currentTime, state, renderGraph);
+      if (activeScenarioId.value === 'SANDBOX_TOUR') {
+        onSandboxTourTimeUpdate(currentTime, state, renderGraph);
+      } else {
+        dispatchVanishingCrackTimeline(currentTime, state, renderGraph);
+      }
+    }
+
+    function onTimeUpdate() {
+      if (usingVirtualTimer.value) return;
+      if (scenarioAudio.value) {
+        audioCurrentTime.value = scenarioAudio.value.currentTime;
+      }
+      processTimelineAt(audioCurrentTime.value);
     }
 
     function onLoadedMetadata() {
-      if (scenarioAudio.value) {
-        audioDuration.value = scenarioAudio.value.duration || 0;
+      if (scenarioAudio.value && scenarioAudio.value.duration) {
+        usingVirtualTimer.value = false;
+        audioDuration.value = scenarioAudio.value.duration;
       }
     }
 
     function onAudioEnded() {
+      clearVirtualTimer();
       isPlaying.value = false;
       currentSubtitleText.value = '';
     }
 
     function onSeek(event) {
       const targetTime = parseFloat(event.target.value);
-      if (scenarioAudio.value) {
+      if (scenarioAudio.value && !usingVirtualTimer.value) {
         scenarioAudio.value.currentTime = targetTime;
       }
       audioCurrentTime.value = targetTime;
 
-      state.eventLog.splice(0, state.eventLog.length);
-      resetTimeline(0);
-      state.currentTime = 0;
-      state.ontology = 'NAIVE_NODE';
-      setPerspective('SMIM');
-      state.graphEngine = 'MERMAID';
-
-      onTimeUpdate();
+      resetActiveScenarioState();
+      processTimelineAt(targetTime);
     }
 
     function formatTime(seconds) {
@@ -772,7 +848,7 @@ const App = {
       fileInput, saveJson, triggerLoadJson, onFileLoaded,
       entityClasses: ENTITY_CLASSES,
       relationTypes: RELATION_TYPES,
-      availableNodes, goHome,
+      availableNodes, goHome, launchScenario, activeScenarioId, activeAudioSrc,
       activeParts, activeWarehouses,
       bizRegType, bizRegId, handleBizRegister,
       bizInstSource, bizInstTarget, handleBizInstall, bizInstallSources, bizInstallTargets,
@@ -806,7 +882,12 @@ const App = {
             <span class="btn-sub-text">Interactive exploration of 3D/4D ontologies &amp; temporal graph models</span>
           </button>
 
-          <button class="menu-btn menu-btn-scenario" @click="state.currentView = 'SCENARIO'">
+          <button class="menu-btn menu-btn-scenario" @click="launchScenario('SANDBOX_TOUR')">
+            <span class="btn-main-text">🎙️ Interactive Tour: How the Workbench Works</span>
+            <span class="btn-sub-text">Guided walkthrough: from real-world queries to knowledge, live sandbox actions &amp; ontologies</span>
+          </button>
+
+          <button class="menu-btn menu-btn-scenario" @click="launchScenario('VANISHING_CRACK')">
             <span class="btn-main-text">Scenario: The Vanishing Crack</span>
             <span class="btn-sub-text">Guided demonstration of temporal defect tracing across lifecycle states</span>
           </button>
@@ -952,7 +1033,7 @@ const App = {
       </div>
 
       <div class="main-container">
-        <div id="canvas-container" :style="{ flex: \`0 0 \${layout.leftWidth}%\` }">
+        <div id="canvas-container" :style="{ flex: '0 0 ' + layout.leftWidth + '%' }">
           <div ref="visContainer" id="vis-container" v-show="state.graphEngine === 'VIS'"></div>
           <div ref="mermaidContainer" id="mermaid-container" v-show="state.graphEngine === 'MERMAID'"></div>
 
@@ -989,7 +1070,7 @@ const App = {
 
         <div class="sidebar" style="flex: 1;">
           <!-- 1. BOM View (URMSM) -->
-          <div class="card" :style="{ flex: \`0 0 \${layout.bomHeight}%\` }">
+          <div class="card" :style="{ flex: '0 0 ' + layout.bomHeight + '%' }">
             <h4>
               <span>{{ t.titleBom }}</span>
               <span class="iec-badge align-right">IEC 63339 / URMSM<span class="iec-tooltip" v-html="t.tooltips.urmsm"></span></span>
@@ -1009,7 +1090,7 @@ const App = {
           <div class="resizer-h" @mousedown="(e) => startResizeV(e, 'bomHeight', '.sidebar')"></div>
 
           <!-- 2. Storage View: UNDER THE BONNET (SMS) -->
-          <div class="card" :style="{ flex: \`0 0 \${layout.storageHeight}%\` }">
+          <div class="card" :style="{ flex: '0 0 ' + layout.storageHeight + '%' }">
             <h4>
               <span>{{ t.titleStorage }} <small style="color:#0284c7; font-weight: 700;">({{ state.ontology }})</small></span>
               <div class="btn-group mini-toggle">
@@ -1123,7 +1204,7 @@ const App = {
       <!-- Hidden Scenario Audio Element -->
       <audio
         ref="scenarioAudio"
-        src="./narratives/Ontologies_-_Disappearing_Crack.mp3"
+        :src="activeAudioSrc"
         preload="metadata"
         @timeupdate="onTimeUpdate"
         @loadedmetadata="onLoadedMetadata"
@@ -1168,7 +1249,7 @@ const App = {
           type="range"
           class="player-progress"
           min="0"
-          :max="audioDuration || 100"
+          :max="audioDuration || 108"
           step="0.1"
           :value="audioCurrentTime"
           @input="onSeek"
@@ -1180,8 +1261,8 @@ const App = {
         <button
           class="player-btn player-btn-cc"
           :class="{ active: showSubtitles }"
+          :title="showSubtitles ? 'Hide Subtitles' : 'Show Subtitles'"
           @click="showSubtitles = !showSubtitles"
-          title="Toggle Subtitles"
           aria-label="Toggle Subtitles"
         >
           CC
