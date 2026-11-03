@@ -11,22 +11,16 @@ import {
   createReportDefectEvent,
   createDismantleEvent
 } from '../smrm/actions.js';
-import { setPerspective } from '../state.js';
+import { setPerspective, nextSequence } from '../state.js';
 
-/**
- * Highlights specified UI elements by IDs with a temporary glowing effect.
- *
- * @param {string[]} elementIds - Array of DOM element IDs to highlight.
- * @param {number} [duration=1200] - Duration of the highlight effect in milliseconds.
- */
 export function highlightUI(elementIds, duration = 1200) {
   if (typeof document === 'undefined' || !Array.isArray(elementIds)) return;
   elementIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.classList.add('scenario-highlight');
+      el.classList.add('tour-pulse-highlight'); // Используем тот же CSS класс, что и в QDIKW
       setTimeout(() => {
-        el.classList.remove('scenario-highlight');
+        el.classList.remove('tour-pulse-highlight');
       }, duration);
     }
   });
@@ -74,9 +68,12 @@ const subtitles = [
 ];
 
 export const vanishingCrackScenario = {
+  id: 'VANISHING_CRACK',
+  title: 'Scenario: The Vanishing Crack',
+  audioSrc: './narratives/Ontologies_-_Disappearing_Crack.mp3',
+  fallbackDuration: 148,
   subtitles,
   timeline: [
-    // 1. t = 1.0: Initialize Naive Node mode, Logical (SMIM) perspective so slot & mounted_in edge are visible
     {
       id: 'step_1_0_init_naive',
       time: 1.0,
@@ -87,8 +84,6 @@ export const vanishingCrackScenario = {
         state.graphEngine = 'MERMAID';
       }
     },
-
-    // 2. t = 15.5: Register Vehicle System_A
     {
       id: 'step_15_5_reg_vehicle',
       time: 15.5,
@@ -96,12 +91,10 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-reg-id', 'biz-reg-btn']);
         state.currentTime = 15.5;
-        const event = createRegisterPartEvent('System_A', state.currentTime, 'Vehicle');
+        const event = createRegisterPartEvent('System_A', state.currentTime, 'Vehicle', nextSequence());
         if (event) state.eventLog.push(event);
       }
     },
-
-    // 3. t = 18.0: Register Part_M01 and install in System_A (creates Slot_System_A_Part_M01)
     {
       id: 'step_18_0_reg_part_install',
       time: 18.0,
@@ -109,14 +102,12 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-reg-id', 'biz-inst-btn']);
         state.currentTime = 18.0;
-        const regEvent = createRegisterPartEvent('Part_M01', state.currentTime, 'Part');
+        const regEvent = createRegisterPartEvent('Part_M01', state.currentTime, 'Part', nextSequence());
         if (regEvent) state.eventLog.push(regEvent);
-        const asmEvent = createAssembleEvent('System_A', 'Part_M01', 'mounted_in', state.currentTime);
+        const asmEvent = createAssembleEvent('System_A', 'Part_M01', 'mounted_in', state.currentTime, nextSequence());
         if (asmEvent) state.eventLog.push(asmEvent);
       }
     },
-
-    // 4. t = 43.0: Report Defect crack=2mm on Part_M01 (attached to NODE)
     {
       id: 'step_43_0_attach_crack_node',
       time: 43.0,
@@ -124,12 +115,10 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-def-target', 'biz-def-btn']);
         state.currentTime = 43.0;
-        const event = createReportDefectEvent('Part_M01', 'crack', '2mm', state.currentTime);
+        const event = createReportDefectEvent('Part_M01', 'crack', '2mm', state.currentTime, nextSequence());
         if (event) state.eventLog.push(event);
       }
     },
-
-    // 5. t = 56.5: Rewind thought-experiment defect before switching strategy to NAIVE_EDGE
     {
       id: 'step_56_5_revoke_crack_node',
       time: 56.5,
@@ -141,8 +130,6 @@ export const vanishingCrackScenario = {
         if (idx !== -1) state.eventLog.splice(idx, 1);
       }
     },
-
-    // 6. t = 58.5: Switch to NAIVE_EDGE
     {
       id: 'step_58_5_switch_strategy_edge',
       time: 58.5,
@@ -152,8 +139,6 @@ export const vanishingCrackScenario = {
         state.ontology = 'NAIVE_EDGE';
       }
     },
-
-    // 7. t = 61.0: Report Defect crack=2mm on Part_M01 (attached to mounted_in EDGE)
     {
       id: 'step_61_0_attach_crack_edge',
       time: 61.0,
@@ -161,12 +146,10 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-def-target', 'biz-def-btn']);
         state.currentTime = 61.0;
-        const event = createReportDefectEvent('Part_M01', 'crack', '2mm', state.currentTime);
+        const event = createReportDefectEvent('Part_M01', 'crack', '2mm', state.currentTime, nextSequence());
         if (event) state.eventLog.push(event);
       }
     },
-
-    // 8. t = 78.0: Dismantle Part_M01
     {
       id: 'step_78_0_dismantle_part',
       time: 78.0,
@@ -174,12 +157,10 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-dism-part', 'biz-dism-btn']);
         state.currentTime = 78.0;
-        const event = createDismantleEvent('Part_M01', state.currentTime);
+        const event = createDismantleEvent('Part_M01', state.currentTime, nextSequence());
         if (event) state.eventLog.push(event);
       }
     },
-
-    // 9. t = 82.0: Register Warehouse_1
     {
       id: 'step_82_0_reg_warehouse',
       time: 82.0,
@@ -187,12 +168,10 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-reg-id', 'biz-reg-btn']);
         state.currentTime = 82.0;
-        const event = createRegisterPartEvent('Warehouse_1', state.currentTime, 'Warehouse');
+        const event = createRegisterPartEvent('Warehouse_1', state.currentTime, 'Warehouse', nextSequence());
         if (event) state.eventLog.push(event);
       }
     },
-
-    // 10. t = 84.0: Move Part_M01 to Warehouse_1
     {
       id: 'step_84_0_store_part',
       time: 84.0,
@@ -200,12 +179,10 @@ export const vanishingCrackScenario = {
       action(state) {
         highlightUI(['biz-store-part', 'biz-store-target', 'biz-store-btn']);
         state.currentTime = 84.0;
-        const event = createAssembleEvent('Warehouse_1', 'Part_M01', 'stored_at', state.currentTime);
+        const event = createAssembleEvent('Warehouse_1', 'Part_M01', 'stored_at', state.currentTime, nextSequence());
         if (event) state.eventLog.push(event);
       }
     },
-
-    // 11. t = 122.0: Switch to ISO 15926 (4D) in Logical (SMIM) Perspective
     {
       id: 'step_122_0_switch_iso',
       time: 122.0,
@@ -219,9 +196,6 @@ export const vanishingCrackScenario = {
   ]
 };
 
-/**
- * Dispatches pending timeline actions based on current playback time.
- */
 export function onTimeUpdate(currentTime, state, renderGraph) {
   if (!Array.isArray(vanishingCrackScenario.timeline)) return;
 
@@ -239,9 +213,6 @@ export function onTimeUpdate(currentTime, state, renderGraph) {
   });
 }
 
-/**
- * Resets execution flags on timeline steps when seeking, stopping, or rewinding.
- */
 export function resetTimeline(targetTime = 0) {
   if (!Array.isArray(vanishingCrackScenario.timeline)) return;
   vanishingCrackScenario.timeline.forEach(step => {
