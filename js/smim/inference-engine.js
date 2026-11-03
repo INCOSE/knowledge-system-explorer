@@ -2,8 +2,9 @@
  * SEMANTIC INFERENCE ENGINE (Q-D-I-K-W)
  * -------------------------------------
  * Evaluates SMRM domain rules against the canonical semantic graph.
- * Injects inferred nodes/edges directly into the graph so both Mermaid/Vis
- * and the query panels reflect Knowledge (K) and Wisdom / Blind Spots (W).
+ * Uses distinct semantic node types (InferredStress, InferredHazard,
+ * WisdomDirective, BlindSpot) and edge type ('inference') so renderers
+ * visually separate database facts from inferred knowledge.
  */
 
 export function applyQdikwInference(graph, state) {
@@ -18,7 +19,7 @@ export function applyQdikwInference(graph, state) {
   const wisdomAlerts = [];
   const blindSpots = [];
 
-  // 1. Decorate Slot nodes with Systems Architect metadata (loadRegime & safetyFunction)
+  // 1. Decorate Slot nodes with Systems Architect metadata
   const slotMetaMap = state.qdikw.slotMetadata || {};
   (graph.nodes || []).forEach(node => {
     const isTargetSlot =
@@ -59,44 +60,46 @@ export function applyQdikwInference(graph, state) {
   });
 
   // 4. Evaluate SMRM Rules for mounted parts
-  Object.keys(mountedPartToSlot).forEach(partId => {
+  Object.keys(activeDefects).forEach(partId => {
     const slotId = mountedPartToSlot[partId];
     const slotNode = graph.nodes.find(n => n.id === slotId);
     const loadRegime = slotNode?.properties?.loadRegime || slotMetaMap['SLOT_FRONT_SUSPENSION']?.loadRegime;
     const safetyFunc = slotNode?.properties?.safetyFunction || slotMetaMap['SLOT_FRONT_SUSPENSION']?.safetyFunction;
 
-    // RULE 1: Context Inheritance (Mounted in Dynamic_Cyclic Slot -> Active_Cyclic_Stress)
-    let rule1Passed = false;
-    const stressId = `Inf_Stress_${partId}`;
-    if (state.qdikw.rules.rule1 && loadRegime === 'DYNAMIC_CYCLIC') {
-      rule1Passed = true;
-      newNodes.push({
-        id: stressId,
-        label: 'ACTIVE_CYCLIC_STRESS',
-        type: 'Quality',
-        properties: { rule: 'Rule 1: Context Inheritance' }
-      });
-      newEdges.push({
-        id: `edge_r1_${partId}`,
-        from: slotId,
-        to: stressId,
-        label: 'infers_stress',
-        type: 'inherence',
-        properties: { isCurrent: true }
-      });
-      newEdges.push({
-        id: `edge_r1_part_${partId}`,
-        from: stressId,
-        to: partId,
-        label: 'acts_on',
-        type: 'inherence',
-        properties: { isCurrent: true }
-      });
-    }
-
     const defects = activeDefects[partId] || [];
     defects.forEach(defect => {
       const defName = (defect.name || '').toLowerCase();
+
+      // RULE 1: Context Inheritance (Mounted in Dynamic_Cyclic Slot -> Active_Cyclic_Stress)
+      let rule1Passed = false;
+      const stressId = `Inf_Stress_${partId}`;
+      if (state.qdikw.rules.rule1 && loadRegime === 'DYNAMIC_CYCLIC') {
+        rule1Passed = true;
+        newNodes.push({
+          id: stressId,
+          label: 'ACTIVE_CYCLIC_STRESS',
+          type: 'InferredStress',
+          properties: { rule: 'Rule 1: Context Inheritance' }
+        });
+        if (slotId) {
+          newEdges.push({
+            id: `edge_r1_${partId}`,
+            from: slotId,
+            to: stressId,
+            label: 'infers_stress',
+            type: 'inference',
+            properties: { isCurrent: true }
+          });
+        }
+        newEdges.push({
+          id: `edge_r1_part_${partId}`,
+          from: stressId,
+          to: partId,
+          label: 'acts_on',
+          type: 'inference',
+          properties: { isCurrent: true }
+        });
+      }
 
       // RULE 2: Material Physics (Active_Cyclic_Stress + Crack > 10mm -> Rapid_Fracture_Propagation)
       let rule2Passed = false;
@@ -108,7 +111,7 @@ export function applyQdikwInference(graph, state) {
           newNodes.push({
             id: fracId,
             label: 'RAPID_FRACTURE_PROPAGATION',
-            type: 'Defect',
+            type: 'InferredHazard',
             properties: { rule: 'Rule 2: Crack > 10mm' }
           });
           newEdges.push({
@@ -116,7 +119,7 @@ export function applyQdikwInference(graph, state) {
             from: stressId,
             to: fracId,
             label: 'triggers_fracture',
-            type: 'has_defect',
+            type: 'inference',
             properties: { isCurrent: true }
           });
         }
@@ -128,29 +131,29 @@ export function applyQdikwInference(graph, state) {
         newNodes.push({
           id: hazardId,
           label: 'HAZARD: LOSS_OF_CONTROL',
-          type: 'Defect',
-          properties: { severity: 'CRITICAL' }
+          type: 'InferredHazard',
+          properties: { rule: 'Rule 3: Safety', severity: 'CRITICAL' }
         });
         newEdges.push({
           id: `edge_r3_${partId}`,
           from: fracId,
           to: hazardId,
           label: 'causes_hazard',
-          type: 'has_defect',
+          type: 'inference',
           properties: { isCurrent: true }
         });
 
         wisdomAlerts.push(
-          `CRITICAL HAZARD: Loss_of_Control risk on Vehicle_1 via ${partId} (15mm crack under Dynamic_Cyclic load). Ground vehicle & generate work order for suspension arm replacement.`
+          `CRITICAL HAZARD: Loss_of_Control risk on Vehicle_1 via ${partId} (${defect.val} crack under Dynamic_Cyclic load). Ground vehicle & generate work order for suspension arm replacement.`
         );
 
-        // On Stage W (Wisdom), also project the prescriptive directive node onto the graph canvas
+        // Stage W (Wisdom): Prescriptive Directive Node (Green Trapezoid)
         if (state.qdikw.stage === 'W') {
           const wisdomNodeId = `Wisdom_Directive_Vehicle_1`;
           newNodes.push({
             id: wisdomNodeId,
             label: 'DIRECTIVE: GROUND VEHICLE_1',
-            type: 'Defect',
+            type: 'WisdomDirective',
             properties: { action: 'Replace Arm SN_404' }
           });
           newEdges.push({
@@ -158,19 +161,19 @@ export function applyQdikwInference(graph, state) {
             from: hazardId,
             to: wisdomNodeId,
             label: 'prescribes_action',
-            type: 'has_defect',
+            type: 'inference',
             properties: { isCurrent: true }
           });
         }
       }
 
-      // BLIND SPOT: Unmapped Defect (e.g. surface_corrosion)
+      // BLIND SPOT: Unmapped Defect (Yellow Parallelogram)
       if (defName !== 'crack') {
         const blindNodeId = `BlindSpot_${defect.name}`;
         newNodes.push({
           id: blindNodeId,
           label: `UNMAPPED: ${defect.name} (${defect.val})`,
-          type: 'Quality',
+          type: 'BlindSpot',
           properties: { status: 'STOPPED AT INFORMATION LAYER', action: 'Escalate to Specialist' }
         });
         newEdges.push({
@@ -178,7 +181,7 @@ export function applyQdikwInference(graph, state) {
           from: partId,
           to: blindNodeId,
           label: 'no_SMRM_rule',
-          type: 'inherence',
+          type: 'inference',
           properties: { isCurrent: true }
         });
 
@@ -189,7 +192,6 @@ export function applyQdikwInference(graph, state) {
     });
   });
 
-  // Deduplicate and append inferred nodes & edges
   newNodes.forEach(nn => {
     if (!graph.nodes.some(existing => existing.id === nn.id)) {
       graph.nodes.push(nn);

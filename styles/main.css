@@ -1139,3 +1139,47 @@ pre.query-code-block {
   color: #78350f;
   font-size: 11px;
 }
+
+/* --- Distinct Legend Swatches for Inferred Knowledge & Wisdom --- */
+.swatch-inf-stress {
+  width: 14px;
+  height: 12px;
+  background: #7c3aed;
+  border: 2px dashed #ddd6fe;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.swatch-inf-hazard {
+  width: 14px;
+  height: 12px;
+  background: #be123c;
+  border: 1.5px dashed #fecdd3;
+  clip-path: polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%);
+  flex-shrink: 0;
+}
+
+.swatch-wisdom-dir {
+  width: 14px;
+  height: 12px;
+  background: #059669;
+  border: 1.5px solid #065f46;
+  clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
+  flex-shrink: 0;
+}
+
+.swatch-blind-spot {
+  width: 14px;
+  height: 12px;
+  background: #fef08a;
+  border: 1.5px solid #ca8a04;
+  transform: skewX(-15deg);
+  flex-shrink: 0;
+}
+
+.swatch-line-inference {
+  width: 18px;
+  height: 0;
+  border-top: 2.5px dashed #8b5cf6;
+  flex-shrink: 0;
+}

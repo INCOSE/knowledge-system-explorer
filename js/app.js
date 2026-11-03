@@ -108,7 +108,6 @@ const App = {
     });
 
     const activeAudioSrc = computed(() => activeScenarioObj.value.audioSrc);
-
     const layout = reactive({ leftWidth: 64, bomHeight: 24, storageHeight: 42 });
     const t = computed(() => i18n[state.language] || i18n.en);
 
@@ -249,6 +248,7 @@ const App = {
 
     const graphLegendItems = computed(() => {
       const nodes = []; const edges = []; const dict = t.value.legend;
+
       if (state.perspective === 'SMRM' || state.ontology === 'NAIVE_NODE' || state.ontology === 'NAIVE_EDGE') {
         nodes.push({ id: 'naiveVehicle', label: dict.naiveVehicle, swatch: 'swatch-box-vehicle' });
         if (state.perspective !== 'SMRM') nodes.push({ id: 'naiveSlot', label: dict.naiveSlot, swatch: 'swatch-box-slot' });
@@ -268,7 +268,7 @@ const App = {
       } else if (state.ontology === 'BFO') {
         nodes.push({ id: 'bfoSys', label: dict.bfoSys, swatch: 'swatch-box-sys' });
         nodes.push({ id: 'bfoElem', label: dict.bfoElem, swatch: 'swatch-box-elem' });
-        nodes.push({ id: 'bfoSlot', label: 'BFO:Site (Functional Slot)', swatch: 'swatch-box-slot' });
+        nodes.push({ id: 'bfoSlot', label: dict.bfoSlot || 'BFO:Site (Functional Slot)', swatch: 'swatch-box-slot' });
         nodes.push({ id: 'bfoQuality', label: dict.bfoQuality, swatch: 'swatch-diamond' });
         if (state.perspective === 'SMS_RDF') {
           nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-diamond' });
@@ -289,6 +289,27 @@ const App = {
         edges.push({ id: 'isoDefectRel', label: dict.isoDefectRel, swatch: 'swatch-line-defect' });
         if (state.perspective === 'SMS_LPG') edges.push({ id: 'isoTrans', label: dict.isoTransitionRel, swatch: 'swatch-line-transition' });
       }
+
+      // Dynamic Legend Additions for Distinct Inferred Knowledge & Wisdom Nodes
+      const gNodes = activeGraph.value.nodes || [];
+      const gEdges = activeGraph.value.edges || [];
+
+      if (gNodes.some(n => n.type === 'InferredStress')) {
+        nodes.push({ id: 'leg_inf_stress', label: dict.infStress, swatch: 'swatch-inf-stress' });
+      }
+      if (gNodes.some(n => n.type === 'InferredHazard')) {
+        nodes.push({ id: 'leg_inf_hazard', label: dict.infHazard, swatch: 'swatch-inf-hazard' });
+      }
+      if (gNodes.some(n => n.type === 'WisdomDirective')) {
+        nodes.push({ id: 'leg_wisdom_dir', label: dict.wisdomDir, swatch: 'swatch-wisdom-dir' });
+      }
+      if (gNodes.some(n => n.type === 'BlindSpot')) {
+        nodes.push({ id: 'leg_blind_spot', label: dict.blindSpot, swatch: 'swatch-blind-spot' });
+      }
+      if (gEdges.some(e => e.type === 'inference')) {
+        edges.push({ id: 'leg_inf_edge', label: dict.infEdge, swatch: 'swatch-line-inference' });
+      }
+
       return { nodes, edges };
     });
 
@@ -359,9 +380,6 @@ const App = {
       }
     }
 
-    /**
-     * Interactive Chapter Navigation for Q-D-I-K-W Pills
-     */
     function jumpToQdikwStage(stageKey) {
       const targetTime = QDIKW_STAGE_TIMESTAMPS[stageKey];
       if (targetTime === undefined) return;
@@ -375,14 +393,10 @@ const App = {
 
     function toggleSlotRegime() {
       if (!state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION) {
-        state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION = {
-          loadRegime: 'DYNAMIC_CYCLIC',
-          safetyFunction: 'STEERING_CONTROL'
-        };
+        state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION = { loadRegime: 'DYNAMIC_CYCLIC', safetyFunction: 'STEERING_CONTROL' };
       } else {
         const cur = state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION.loadRegime;
-        state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION.loadRegime =
-          cur === 'DYNAMIC_CYCLIC' ? 'STATIC_LOAD' : 'DYNAMIC_CYCLIC';
+        state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION.loadRegime = cur === 'DYNAMIC_CYCLIC' ? 'STATIC_LOAD' : 'DYNAMIC_CYCLIC';
       }
       renderGraph();
     }
@@ -540,7 +554,6 @@ const App = {
     function handleBizInstall() {
       if (!bizInstSource.value || !bizInstTarget.value) return;
       if (bizInstSource.value === bizInstTarget.value) return;
-      // Automatically dismantle from warehouse/previous location before installing
       if (installedComponents.value.includes(bizInstSource.value)) {
         dispatch(createDismantleEvent(bizInstSource.value, state.currentTime, nextSequence()));
       }
@@ -563,15 +576,29 @@ const App = {
       }
     }
 
+    function handleBizDeleteDefect() {
+      if (!bizRevDefect.value) return;
+      const item = activeDefectsList.value.find(d => d.id === bizRevDefect.value);
+      if (item) {
+        for (let i = state.eventLog.length - 1; i >= 0; i--) {
+          const ev = state.eventLog[i];
+          if ((ev.type === 'REPORT_DEFECT' || ev.type === 'REVOKE_DEFECT') &&
+              ev.targetId === item.targetId &&
+              ev.defectName === item.defectName) {
+            state.eventLog.splice(i, 1);
+          }
+        }
+        bizRevDefect.value = '';
+        renderGraph();
+      }
+    }
+
     function handleBizDismantle() {
       if (!bizDismPart.value) return;
       const event = createDismantleEvent(bizDismPart.value, state.currentTime, nextSequence());
       if (event) { dispatch(event); bizDismPart.value = ''; }
     }
 
-    /**
-     * Completely deletes a node and its associated events from the repository (Point 9)
-     */
     function handleBizDeleteNode() {
       const target = bizDeleteNodeId.value;
       if (!target) return;
@@ -663,7 +690,7 @@ const App = {
       activeParts, activeWarehouses, bizRegType, bizRegId, handleBizRegister,
       bizInstSource, bizInstTarget, handleBizInstall, bizInstallSources, bizInstallTargets,
       bizDefTarget, bizDefType, bizDefVal, handleBizReportDefect,
-      bizRevDefect, handleBizRevokeDefect, activeDefectsList,
+      bizRevDefect, handleBizRevokeDefect, handleBizDeleteDefect, activeDefectsList,
       bizDismPart, handleBizDismantle, installedComponents,
       bizDeleteNodeId, handleBizDeleteNode,
       bizStorePart, bizStoreTarget, handleBizStore,
@@ -679,29 +706,29 @@ const App = {
     <!-- Main Menu (Landing View) -->
     <div v-if="state.currentView === 'MENU'" class="landing-view">
       <div class="menu-card">
-        <div class="menu-badge">IEC 63339 Workbench</div>
-        <h1 class="menu-title">Knowledge Architecture Workbench</h1>
-        <p class="menu-subtitle">Top-Level Ontologies (SMIM), Physical Storage (SMS) &amp; Event Sourcing</p>
+        <div class="menu-badge">{{ t.menuBadge }}</div>
+        <h1 class="menu-title">{{ t.menuTitle }}</h1>
+        <p class="menu-subtitle">{{ t.menuSubtitle }}</p>
 
         <div class="menu-actions">
           <button class="menu-btn menu-btn-primary" @click="state.currentView = 'SANDBOX'">
-            <span class="btn-main-text">Sandbox Mode</span>
-            <span class="btn-sub-text">Interactive exploration of 3D/4D ontologies &amp; temporal graph models</span>
+            <span class="btn-main-text">{{ t.menuSandboxTitle }}</span>
+            <span class="btn-sub-text">{{ t.menuSandboxSub }}</span>
           </button>
 
           <button class="menu-btn menu-btn-scenario" @click="launchScenario('SANDBOX_TOUR')">
-            <span class="btn-main-text">🎙️ Interactive Tour: How the Workbench Works</span>
-            <span class="btn-sub-text">Guided walkthrough: from real-world queries to knowledge, live sandbox actions &amp; ontologies</span>
+            <span class="btn-main-text">{{ t.menuTourTitle }}</span>
+            <span class="btn-sub-text">{{ t.menuTourSub }}</span>
           </button>
 
           <button class="menu-btn menu-btn-scenario" @click="launchScenario('QDIKW_PIPELINE')">
-            <span class="btn-main-text">🧠 The Q-D-I-K-W Pipeline (Roles &amp; Rules)</span>
-            <span class="btn-sub-text">From Question to Wisdom: Explaining role separation, modular inference &amp; blind spots</span>
+            <span class="btn-main-text">{{ t.menuQdikwTitle }}</span>
+            <span class="btn-sub-text">{{ t.menuQdikwSub }}</span>
           </button>
 
           <button class="menu-btn menu-btn-scenario" @click="launchScenario('VANISHING_CRACK')">
-            <span class="btn-main-text">Scenario: The Vanishing Crack</span>
-            <span class="btn-sub-text">Guided demonstration of temporal defect tracing across lifecycle states</span>
+            <span class="btn-main-text">{{ t.menuCrackTitle }}</span>
+            <span class="btn-sub-text">{{ t.menuCrackSub }}</span>
           </button>
         </div>
       </div>
@@ -710,7 +737,7 @@ const App = {
     <!-- Fullscreen Narrative Figure Overlay -->
     <div v-if="state.figureOverlay?.visible" class="figure-modal-overlay">
       <div class="figure-modal-card">
-        <button class="figure-modal-close" @click="state.figureOverlay.visible = false">Close</button>
+        <button class="figure-modal-close" @click="state.figureOverlay.visible = false">{{ t.closeBtn }}</button>
         <img :src="state.figureOverlay.src" class="figure-modal-img" alt="Narrative Figure" />
         <div class="figure-modal-caption">{{ state.figureOverlay.caption }}</div>
         <div class="figure-modal-attribution" v-html="state.figureOverlay.attributionHtml"></div>
@@ -721,44 +748,14 @@ const App = {
     <div v-if="state.currentView !== 'MENU'" class="sandbox-workspace">
       <div class="control-deck">
 
-        <!-- QDIKW Stage & Role Banner (Clickable Chapter Navigation!) -->
+        <!-- QDIKW Stage & Role Banner -->
         <div id="qdikw-stage-bar" v-if="state.qdikw?.active" class="qdikw-banner">
           <div class="qdikw-steps">
-            <span
-              id="qdikw-step-Q"
-              class="qdikw-step-pill"
-              :class="{active: state.qdikw.stage === 'Q' || state.qdikw.stage === 'INTRO'}"
-              title="Click to jump to Stage 1: Question (01:02)"
-              @click="jumpToQdikwStage('Q')"
-            >Q - Question</span>
-            <span
-              id="qdikw-step-D"
-              class="qdikw-step-pill"
-              :class="{active: state.qdikw.stage === 'D'}"
-              title="Click to jump to Stage 2: Data (02:08)"
-              @click="jumpToQdikwStage('D')"
-            >D - Data</span>
-            <span
-              id="qdikw-step-I"
-              class="qdikw-step-pill"
-              :class="{active: state.qdikw.stage === 'I'}"
-              title="Click to jump to Stage 3: Information (03:09)"
-              @click="jumpToQdikwStage('I')"
-            >I - Information</span>
-            <span
-              id="qdikw-step-K"
-              class="qdikw-step-pill"
-              :class="{active: state.qdikw.stage === 'K'}"
-              title="Click to jump to Stage 4: Knowledge (04:56)"
-              @click="jumpToQdikwStage('K')"
-            >K - Knowledge</span>
-            <span
-              id="qdikw-step-W"
-              class="qdikw-step-pill"
-              :class="{active: state.qdikw.stage === 'W'}"
-              title="Click to jump to Stage 5: Wisdom (06:33)"
-              @click="jumpToQdikwStage('W')"
-            >W - Wisdom</span>
+            <span id="qdikw-step-Q" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'Q' || state.qdikw.stage === 'INTRO'}" @click="jumpToQdikwStage('Q')">{{ t.qdikwStepQ }}</span>
+            <span id="qdikw-step-D" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'D'}" @click="jumpToQdikwStage('D')">{{ t.qdikwStepD }}</span>
+            <span id="qdikw-step-I" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'I'}" @click="jumpToQdikwStage('I')">{{ t.qdikwStepI }}</span>
+            <span id="qdikw-step-K" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'K'}" @click="jumpToQdikwStage('K')">{{ t.qdikwStepK }}</span>
+            <span id="qdikw-step-W" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'W'}" @click="jumpToQdikwStage('W')">{{ t.qdikwStepW }}</span>
           </div>
           <div class="qdikw-role-box" v-if="state.qdikw.activeRole">
             <span class="qdikw-role-name">{{ state.qdikw.activeRole }}</span>
@@ -766,36 +763,30 @@ const App = {
           </div>
         </div>
 
-        <!-- Semantic Rules Toolbar (Interactive checkboxes) -->
+        <!-- Semantic Rules Toolbar -->
         <div id="qdikw-rules-bar" v-if="state.qdikw?.active" class="smrm-rules-row">
-          <span style="color:#4c1d95; font-weight:700; margin-right: 8px;">🧠 SMRM Rules:</span>
+          <span style="color:#4c1d95; font-weight:700; margin-right: 8px;">{{ t.smrmRulesLabel }}</span>
           <label id="qdikw-rule-1" class="rule-chip" :class="{active: state.qdikw.rules.rule1}">
             <input type="checkbox" v-model="state.qdikw.rules.rule1" @change="renderGraph" style="display:none;">
-            [1] Context Inheritance (Slot &rarr; Stress)
+            {{ t.rule1Label }}
           </label>
           <label id="qdikw-rule-2" class="rule-chip" :class="{active: state.qdikw.rules.rule2}">
             <input type="checkbox" v-model="state.qdikw.rules.rule2" @change="renderGraph" style="display:none;">
-            [2] Material Physics (Crack &gt; 10mm &rarr; Fracture)
+            {{ t.rule2Label }}
           </label>
           <label id="qdikw-rule-3" class="rule-chip" :class="{active: state.qdikw.rules.rule3}">
             <input type="checkbox" v-model="state.qdikw.rules.rule3" @change="renderGraph" style="display:none;">
-            [3] Functional Safety (Fracture &rarr; Loss of Control)
+            {{ t.rule3Label }}
           </label>
 
           <div id="qdikw-slot-config" style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-            <span style="font-weight: 600;">Suspension Slot Regime:</span>
-            <button
-              class="rule-chip"
-              :class="{active: state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime === 'DYNAMIC_CYCLIC'}"
-              @click="toggleSlotRegime"
-              title="Click to toggle slot regime between DYNAMIC_CYCLIC and STATIC_LOAD"
-            >
-              {{ state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime || 'No Load Defined (Click to Set)' }}
+            <span style="font-weight: 600;">{{ t.slotRegimeLabel }}</span>
+            <button class="rule-chip" :class="{active: state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime === 'DYNAMIC_CYCLIC'}" @click="toggleSlotRegime">
+              {{ state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime || t.slotNoLoad }}
             </button>
           </div>
         </div>
 
-        <!-- Tier 1: Unified Architecture & Perspective Controls -->
         <div class="deck-row deck-row-top">
           <div class="section-label">
             <span class="iec-badge">IEC 63339 / SMIM<span class="iec-tooltip" v-html="t.tooltips.smim"></span></span>
@@ -842,16 +833,14 @@ const App = {
           </div>
         </div>
 
-        <!-- Tier 2: Engineer Lifecycle Actions -->
         <template v-if="state.userRole === 'UNI_ENGINEER'">
-          <!-- Row 1: Time, Register, Install, Dismantle, Delete -->
           <div class="deck-row">
             <span id="biz-time-badge" class="badge">T = {{ state.currentTime }}</span>
             <button id="biz-step-btn" @click="advanceTime">{{ t.stepBtn }}</button>
 
             <div class="divider"></div>
 
-            <label class="action-label">1. Register:</label>
+            <label class="action-label">{{ t.actRegister }}</label>
             <select id="biz-reg-type" v-model="bizRegType" title="Entity Class">
               <option value="Vehicle">Vehicle</option>
               <option value="Slot">Slot</option>
@@ -859,11 +848,11 @@ const App = {
               <option value="Warehouse">Warehouse</option>
             </select>
             <input id="biz-reg-id" type="text" v-model="bizRegId" placeholder="ID (e.g. Part_B)" style="width: 110px;" @keyup.enter="handleBizRegister">
-            <button id="biz-reg-btn" class="secondary" @click="handleBizRegister">Register</button>
+            <button id="biz-reg-btn" class="secondary" @click="handleBizRegister">{{ t.actRegisterBtn }}</button>
 
             <div class="divider"></div>
 
-            <label class="action-label">2. Install:</label>
+            <label class="action-label">{{ t.actInstall }}</label>
             <select id="biz-inst-source" v-model="bizInstSource" title="Component to install">
               <option v-for="node in bizInstallSources" :key="'src_' + node" :value="node">{{ node }}</option>
             </select>
@@ -871,46 +860,46 @@ const App = {
             <select id="biz-inst-target" v-model="bizInstTarget" title="Target Parent / System">
               <option v-for="node in bizInstallTargets" :key="'tgt_' + node" :value="node">{{ node }}</option>
             </select>
-            <button id="biz-inst-btn" class="secondary" @click="handleBizInstall">Install</button>
+            <button id="biz-inst-btn" class="secondary" @click="handleBizInstall">{{ t.actInstallBtn }}</button>
 
             <div class="divider"></div>
 
-            <label class="action-label">5. Dismantle:</label>
+            <label class="action-label">{{ t.actDismantle }}</label>
             <select id="biz-dism-part" v-model="bizDismPart">
               <option v-for="comp in installedComponents" :key="'comp_' + comp" :value="comp">{{ comp }}</option>
             </select>
-            <button id="biz-dism-btn" class="danger" @click="handleBizDismantle">Dismantle</button>
+            <button id="biz-dism-btn" class="danger" @click="handleBizDismantle">{{ t.actDismantleBtn }}</button>
 
             <div class="divider"></div>
 
-            <label class="action-label">Delete:</label>
-            <select id="biz-del-node" v-model="bizDeleteNodeId" title="Delete entity completely">
+            <label class="action-label">{{ t.actDelete }}</label>
+            <select id="biz-del-node" v-model="bizDeleteNodeId" title="Sandbox Reset: Delete entity">
               <option v-for="node in availableNodes" :key="'del_' + node" :value="node">{{ node }}</option>
             </select>
-            <button id="biz-del-btn" class="danger" @click="handleBizDeleteNode" title="Delete selected entity">🗑️</button>
+            <button id="biz-del-btn" class="danger" @click="handleBizDeleteNode" title="Sandbox Reset: Delete selected entity">🗑️</button>
           </div>
 
-          <!-- Row 2: Defect, Revoke, Storage, History -->
           <div class="deck-row" style="border-top: 1px solid #f1f5f9; background: #fafafa;">
-            <label class="action-label">3. Defect:</label>
+            <label class="action-label">{{ t.actDefect }}</label>
             <select id="biz-def-target" v-model="bizDefTarget">
               <option v-for="node in availableNodes" :key="'dn_' + node" :value="node">{{ node }}</option>
             </select>
             <input id="biz-def-type" type="text" v-model="bizDefType" placeholder="Type (e.g. crack)" style="width: 110px;">
             <input id="biz-def-val" type="text" v-model="bizDefVal" placeholder="Value (e.g. 15mm)" style="width: 85px;">
-            <button id="biz-def-btn" class="secondary" @click="handleBizReportDefect">Report Defect</button>
+            <button id="biz-def-btn" class="secondary" @click="handleBizReportDefect">{{ t.actDefectBtn }}</button>
 
             <div class="divider"></div>
 
-            <label class="action-label">4. Revoke:</label>
+            <label class="action-label">{{ t.actRevoke }}</label>
             <select id="biz-rev-defect" v-model="bizRevDefect">
               <option v-for="d in activeDefectsList" :key="d.id" :value="d.id">{{ d.label }}</option>
             </select>
-            <button id="biz-rev-btn" class="danger" @click="handleBizRevokeDefect">Revoke</button>
+            <button id="biz-rev-btn" class="secondary" @click="handleBizRevokeDefect" title="Revoke defect (close in history)">{{ t.actRevokeBtn }}</button>
+            <button id="biz-del-def-btn" class="danger" @click="handleBizDeleteDefect" title="Sandbox Reset: Delete defect completely">🗑️</button>
 
             <div class="divider"></div>
 
-            <label class="action-label">6. Storage:</label>
+            <label class="action-label">{{ t.actStorage }}</label>
             <select id="biz-store-part" v-model="bizStorePart">
               <option v-for="part in activeParts" :key="'sp_' + part" :value="part">{{ part }}</option>
             </select>
@@ -918,7 +907,7 @@ const App = {
             <select id="biz-store-target" v-model="bizStoreTarget">
               <option v-for="wh in activeWarehouses" :key="'sw_' + wh" :value="wh">{{ wh }}</option>
             </select>
-            <button id="biz-store-btn" class="secondary" @click="handleBizStore">Store</button>
+            <button id="biz-store-btn" class="secondary" @click="handleBizStore">{{ t.actStorageBtn }}</button>
 
             <div class="divider"></div>
 
@@ -963,7 +952,6 @@ const App = {
         <div class="resizer" id="panel-resizer" @mousedown="startResizeH"></div>
 
         <div class="sidebar" style="flex: 1;">
-          <!-- 1. BOM View (URMSM) -->
           <div class="card" :style="{ flex: '0 0 ' + layout.bomHeight + '%' }">
             <h4>
               <span>{{ t.titleBom }}</span>
@@ -983,7 +971,6 @@ const App = {
 
           <div class="resizer-h" @mousedown="(e) => startResizeV(e, 'bomHeight', '.sidebar')"></div>
 
-          <!-- 2. Storage View: UNDER THE BONNET (SMS) -->
           <div class="card" :style="{ flex: '0 0 ' + layout.storageHeight + '%' }">
             <h4>
               <span>{{ t.titleStorage }} <small style="color:#0284c7; font-weight: 700;">({{ state.ontology }})</small></span>
@@ -1048,7 +1035,6 @@ const App = {
 
           <div class="resizer-h" @mousedown="(e) => startResizeV(e, 'storageHeight', '.sidebar')"></div>
 
-          <!-- 3. Database Query & Live Execution Result -->
           <div class="card" style="flex: 1;">
             <h4>
               <span>{{ t.queryTitle }} ({{ state.storage === 'LPG' ? 'Cypher' : 'SPARQL' }})</span>
@@ -1070,10 +1056,10 @@ const App = {
 
                 <!-- QDIKW Alerts (Wisdom & Blind Spots) -->
                 <div id="qdikw-wisdom-box" v-for="alert in semanticGraph.wisdomAlerts" :key="alert" class="wisdom-directive-card">
-                  🔴 <strong>WISDOM REACHED:</strong> {{ alert }}
+                  🔴 <strong>{{ t.wisdomHeader }}</strong> {{ alert }}
                 </div>
                 <div id="qdikw-blindspot-box" v-for="bs in semanticGraph.blindSpots" :key="bs" class="blindspot-warning-card">
-                  ⚠️ <strong>BOUNDARY WARNING:</strong> {{ bs }}
+                  ⚠️ <strong>{{ t.blindspotHeader }}</strong> {{ bs }}
                 </div>
 
                 <table v-if="liveQueryResult.rows.length > 0" class="storage-table" style="margin-top: 8px;">
@@ -1101,80 +1087,18 @@ const App = {
         </div>
       </div>
 
-      <!-- Hidden Scenario Audio Element -->
-      <audio
-        ref="scenarioAudio"
-        :src="activeAudioSrc"
-        preload="metadata"
-        @timeupdate="onTimeUpdate"
-        @loadedmetadata="onLoadedMetadata"
-        @play="isPlaying = true"
-        @pause="isPlaying = false"
-        @ended="onAudioEnded"
-      ></audio>
+      <audio ref="scenarioAudio" :src="activeAudioSrc" preload="metadata" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata" @play="isPlaying = true" @pause="isPlaying = false" @ended="onAudioEnded"></audio>
+      <div v-if="state.currentView === 'SCENARIO' && showSubtitles && currentSubtitleText" class="scenario-subtitles">{{ currentSubtitleText }}</div>
 
-      <!-- Subtitles Overlay -->
-      <div
-        v-if="state.currentView === 'SCENARIO' && showSubtitles && currentSubtitleText"
-        class="scenario-subtitles"
-      >
-        {{ currentSubtitleText }}
-      </div>
-
-      <!-- Floating Player Panel -->
-      <div
-        v-if="state.currentView === 'SCENARIO'"
-        class="scenario-player-panel"
-      >
-        <button
-          class="player-btn"
-          @click="togglePlayAudio"
-          :title="isPlaying ? 'Pause' : 'Play'"
-        >
-          <span v-if="isPlaying">⏸</span>
-          <span v-else>▶</span>
-        </button>
-
-        <button
-          class="player-btn"
-          @click="stopAudio(true)"
-          title="Stop"
-        >
-          <span>⏹</span>
-        </button>
-
-        <input
-          type="range"
-          class="player-progress"
-          min="0"
-          :max="audioDuration || 108"
-          step="0.1"
-          :value="audioCurrentTime"
-          @input="onSeek"
-        />
-
+      <div v-if="state.currentView === 'SCENARIO'" class="scenario-player-panel">
+        <button class="player-btn" @click="togglePlayAudio" :title="isPlaying ? 'Pause' : 'Play'"><span v-if="isPlaying">⏸</span><span v-else>▶</span></button>
+        <button class="player-btn" @click="stopAudio(true)" title="Stop"><span>⏹</span></button>
+        <input type="range" class="player-progress" min="0" :max="audioDuration || 108" step="0.1" :value="audioCurrentTime" @input="onSeek" />
         <span class="player-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
-
-        <button
-          class="player-btn player-btn-cc"
-          :class="{ active: showSubtitles }"
-          @click="showSubtitles = !showSubtitles"
-        >
-          CC
-        </button>
+        <button class="player-btn player-btn-cc" :class="{ active: showSubtitles }" @click="showSubtitles = !showSubtitles">CC</button>
       </div>
-
-      <!-- Floating Home Button -->
-      <button
-        v-if="state.currentView !== 'MENU'"
-        class="floating-home-btn"
-        @click="goHome"
-        title="Return to Main Menu"
-      >
-        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
+      <button v-if="state.currentView !== 'MENU'" class="floating-home-btn" @click="goHome" title="Return to Main Menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
       </button>
     </div>
   `

@@ -2,7 +2,7 @@
  * MERMAID RENDERER ADAPTER
  * ------------------------
  * Translates the abstract Semantic Graph into Mermaid flowchart syntax
- * and renders it to the DOM with ELK layout and svg-pan-zoom support.
+ * with distinct shapes & colours for Recorded Facts vs Inferred Knowledge.
  */
 
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
@@ -88,8 +88,13 @@ function buildMermaidDefinition(semanticGraph) {
   def += '  classDef naiveVehicle fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
   def += '  classDef naiveSlot fill:#64748b,stroke:#475569,color:#ffffff,stroke-width:1px\n';
   def += '  classDef naivePart fill:#10b981,stroke:#059669,color:#ffffff,stroke-width:2px\n';
-  def += '  classDef naiveDefect fill:#ef4444,stroke:#dc2626,color:#ffffff,stroke-width:2px\n';
-  def += '  classDef naiveWarehouse fill:#f97316,stroke:#ea580c,color:#ffffff,stroke-width:2px\n\n';
+  def += '  classDef naiveDefect fill:#ef4444,stroke:#b91c1c,color:#ffffff,stroke-width:2px\n';
+  def += '  classDef naiveWarehouse fill:#f97316,stroke:#ea580c,color:#ffffff,stroke-width:2px\n';
+  // Distinct Inferred Knowledge & Wisdom Styles
+  def += '  classDef infStress fill:#7c3aed,stroke:#5b21b6,color:#ffffff,stroke-width:2px,stroke-dasharray:5 2\n';
+  def += '  classDef infHazard fill:#be123c,stroke:#881337,color:#ffffff,stroke-width:2.5px,stroke-dasharray:6 2\n';
+  def += '  classDef wisdomDir fill:#059669,stroke:#065f46,color:#ffffff,stroke-width:3px\n';
+  def += '  classDef blindSpot fill:#fef08a,stroke:#ca8a04,color:#713f12,stroke-width:2.5px,stroke-dasharray:4 2\n\n';
 
   (semanticGraph.nodes || []).forEach(node => {
     const safeId = sanitizeId(node.id);
@@ -110,22 +115,40 @@ function buildMermaidDefinition(semanticGraph) {
       .replace(/\n/g, '<br/>')
       .replace(/"/g, '&quot;');
 
-    let shapeOpen = '["';
-    let shapeClose = '"]';
-
     const isSlotNode = node.id.startsWith('Slot_') || node.properties?.entityClass === 'Slot' || node.type === 'Slot';
     let entityType = node.type || node.properties?.entityClass;
 
-    // Distinguish BFO Site (Slot) from physical MaterialEntity
     if (entityType === 'MaterialEntity' && isSlotNode) {
       entityType = 'BFO:Site (Slot)';
     }
 
-    if (entityType === 'TemporalPartMembership' || entityType === 'RelationalQuality' || entityType === 'Defect' || /^def/i.test(node.id)) {
-      shapeOpen = '{{"';
+    // Distinct Mermaid geometry per ontological / inference role
+    let shapeOpen = '["';
+    let shapeClose = '"]';
+
+    if (entityType === 'InferredStress') {
+      // Subroutine shape [[...]] for inferred stress state
+      shapeOpen = '[["🧠 ';
+      shapeClose = '"]]';
+    } else if (entityType === 'InferredHazard') {
+      // Hexagon shape {{...}} for inferred fracture / hazard
+      shapeOpen = '{{"⚡ ';
+      shapeClose = '"}}';
+    } else if (entityType === 'WisdomDirective') {
+      // Trapezoid [/...\] for actionable wisdom directive
+      shapeOpen = '[/"✅ ';
+      shapeClose = '"\\]';
+    } else if (entityType === 'BlindSpot') {
+      // Parallelogram [/.../] for unmapped blind spot warning
+      shapeOpen = '[/"⚠️ ';
+      shapeClose = '"/]';
+    } else if (entityType === 'TemporalPartMembership' || entityType === 'RelationalQuality' || entityType === 'Defect' || /^def/i.test(node.id)) {
+      // Recorded Defect
+      shapeOpen = '{{"🔧 ';
       shapeClose = '"}}';
     } else if (entityType === 'Literal' || entityType === 'Quality' || entityType === 'DependentContinuant' || /^qual/i.test(node.id)) {
-      shapeOpen = '(["';
+      // Recorded BFO Quality
+      shapeOpen = '(["🔍 ';
       shapeClose = '"])';
     }
 
@@ -143,7 +166,7 @@ function buildMermaidDefinition(semanticGraph) {
     let linkArrow = '-->';
     if (edge.type === 'transition') {
       linkArrow = '==>';
-    } else if (!isCurrent || edge.type === 'classification' || edge.type === 'reification' || edge.type === 'predicate') {
+    } else if (edge.type === 'inference' || !isCurrent || edge.type === 'classification' || edge.type === 'reification' || edge.type === 'predicate') {
       linkArrow = '-.->';
     }
 
@@ -186,6 +209,9 @@ function getMermaidEdgeStyle(edge) {
   const rel = (edge.type || '').toLowerCase();
   const label = (edge.label || '').toLowerCase();
 
+  if (rel === 'inference') {
+    return { stroke: '#8b5cf6', width: 2.5, dash: '5 3' };
+  }
   if (rel === 'has_defect' || label === 'has_defect' || label === 'defect') {
     return { stroke: '#ef4444', width: 2.5 };
   }
@@ -216,6 +242,14 @@ function getNodeClass(node) {
   const isSlotNode = node.id.startsWith('Slot_') || node.properties?.entityClass === 'Slot' || node.type === 'Slot';
 
   switch (entityType) {
+    case 'InferredStress':
+      return 'infStress';
+    case 'InferredHazard':
+      return 'infHazard';
+    case 'WisdomDirective':
+      return 'wisdomDir';
+    case 'BlindSpot':
+      return 'blindSpot';
     case 'Vehicle':
       return 'naiveVehicle';
     case 'Slot':
