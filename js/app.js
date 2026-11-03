@@ -20,6 +20,7 @@ import { ENTITY_CLASSES, RELATION_TYPES, INTERNAL_PROPERTY_KEYS, inferEntityClas
 import * as bfoAdapter from './smim/bfo.js';
 import * as isoAdapter from './smim/iso15926.js';
 import * as naiveAdapter from './smim/naive.js';
+import { applyQdikwInference } from './smim/inference-engine.js';
 import { initVisNetwork, updateVisNetwork } from './renderers/vis-adapter.js';
 import { updateMermaidNetwork } from './renderers/mermaid-adapter.js';
 import { generateBomTrees } from './urmsm/bom-view.js';
@@ -42,54 +43,40 @@ import {
   onSandboxTourTimeUpdate,
   resetSandboxTourTimeline
 } from './scenarios/scenario-sandbox-tour.js';
+import {
+  qdikwScenario,
+  QDIKW_STAGE_TIMESTAMPS,
+  onQdikwTimeUpdate,
+  resetQdikwTimeline
+} from './scenarios/scenario-qdikw.js';
 
-/**
- * RECURSIVE BOM TREE NODE COMPONENT
- * ---------------------------------
- * Renders hierarchical Bill of Materials nodes with entity class badges
- * and surviving defect indicators at time T.
- */
 const BomNode = {
   name: 'BomNode',
   props: {
-    node: {
-      type: Object,
-      required: true
-    }
+    node: { type: Object, required: true }
   },
   template: `
     <li>
       <span class="bom-node-row">
         <strong>{{ node.id }}</strong>
         <span class="bom-class-badge">{{ node.entityClass }}</span>
-        <span
-          v-for="def in (node.defects || [])"
-          :key="def"
-          class="bom-defect-badge"
-        >⚠️ {{ def }}</span>
+        <span v-for="def in (node.defects || [])" :key="def" class="bom-defect-badge">⚠️ {{ def }}</span>
       </span>
       <ul v-if="node.children && node.children.length > 0" class="tree">
-        <bom-node
-          v-for="child in node.children"
-          :key="child.id"
-          :node="child"
-        />
+        <bom-node v-for="child in node.children" :key="child.id" :node="child" />
       </ul>
     </li>
   `
 };
 
 const App = {
-  components: {
-    BomNode
-  },
+  components: { BomNode },
   setup() {
-    // DOM References for renderers & file operations
     const visContainer = ref(null);
     const mermaidContainer = ref(null);
     const fileInput = ref(null);
 
-    // Universal Engineer Business UI inputs
+    // Business UI inputs
     const bizRegType = ref('Part');
     const bizRegId = ref('');
     const bizInstSource = ref('');
@@ -99,11 +86,12 @@ const App = {
     const bizDefVal = ref('');
     const bizRevDefect = ref('');
     const bizDismPart = ref('');
+    const bizDeleteNodeId = ref('');
     const bizStorePart = ref('');
     const bizStoreTarget = ref('');
 
-    // Scenario Player State (Supports multiple scenarios + virtual fallback timer)
-    const activeScenarioId = ref('VANISHING_CRACK'); // 'SANDBOX_TOUR' | 'VANISHING_CRACK'
+    // Scenario Player State
+    const activeScenarioId = ref('QDIKW_PIPELINE');
     const scenarioAudio = ref(null);
     const isPlaying = ref(false);
     const audioCurrentTime = ref(0);
@@ -113,128 +101,78 @@ const App = {
     let virtualTimerInterval = null;
     const usingVirtualTimer = ref(false);
 
-    const activeScenarioObj = computed(() =>
-      activeScenarioId.value === 'SANDBOX_TOUR' ? sandboxTourScenario : vanishingCrackScenario
-    );
+    const activeScenarioObj = computed(() => {
+      if (activeScenarioId.value === 'SANDBOX_TOUR') return sandboxTourScenario;
+      if (activeScenarioId.value === 'QDIKW_PIPELINE') return qdikwScenario;
+      return vanishingCrackScenario;
+    });
 
-    const activeAudioSrc = computed(() =>
-      activeScenarioId.value === 'SANDBOX_TOUR'
-        ? './narratives/Ontologies_-_Sandbox_Tour.mp3'
-        : './narratives/Ontologies_-_Disappearing_Crack.mp3'
-    );
+    const activeAudioSrc = computed(() => activeScenarioObj.value.audioSrc);
 
-    // Layout State (Flex percentages for resizers)
     const layout = reactive({ leftWidth: 64, bomHeight: 24, storageHeight: 42 });
-
-    // Active dictionary based on state.language
     const t = computed(() => i18n[state.language] || i18n.en);
 
-    // Reconstruct base registered entities up to state.currentTime
     const baseNodes = computed(() => {
       const nodeMap = new Map();
-
       state.eventLog.forEach(event => {
         if (event.valid_from !== undefined && event.valid_from > state.currentTime) return;
-
         if (event.type === 'REGISTER_PART' && event.partId) {
           const cls = inferEntityClass(event.partId, event.entityClass);
-          nodeMap.set(event.partId, {
-            id: event.partId,
-            label: event.partId,
-            type: cls,
-            entityClass: cls
-          });
+          nodeMap.set(event.partId, { id: event.partId, label: event.partId, type: cls, entityClass: cls });
         } else if (event.type === 'ASSEMBLE') {
           if (event.parentId && !nodeMap.has(event.parentId)) {
             const pCls = inferEntityClass(event.parentId);
-            nodeMap.set(event.parentId, {
-              id: event.parentId,
-              label: event.parentId,
-              type: pCls,
-              entityClass: pCls
-            });
+            nodeMap.set(event.parentId, { id: event.parentId, label: event.parentId, type: pCls, entityClass: pCls });
           }
           if (event.childId && !nodeMap.has(event.childId)) {
             const cCls = inferEntityClass(event.childId);
-            nodeMap.set(event.childId, {
-              id: event.childId,
-              label: event.childId,
-              type: cCls,
-              entityClass: cCls
-            });
+            nodeMap.set(event.childId, { id: event.childId, label: event.childId, type: cCls, entityClass: cCls });
           }
         }
       });
-
       return Array.from(nodeMap.values());
     });
 
     const availableNodes = computed(() => baseNodes.value.map(n => n.id));
+    const activeParts = computed(() => baseNodes.value.filter(n => n.entityClass !== 'Slot' && n.entityClass !== 'Warehouse').map(n => n.id));
+    const activeWarehouses = computed(() => baseNodes.value.filter(n => n.entityClass === 'Warehouse').map(n => n.id));
+    const bizInstallSources = computed(() => baseNodes.value.filter(n => n.entityClass === 'Part').map(n => n.id));
+    const bizInstallTargets = computed(() => baseNodes.value.filter(n => n.entityClass === 'Vehicle' || n.entityClass === 'Part' || n.entityClass === 'Slot').map(n => n.id));
 
-    const activeParts = computed(() =>
-      baseNodes.value.filter(n => n.entityClass !== 'Slot' && n.entityClass !== 'Warehouse').map(n => n.id)
-    );
-
-    const activeWarehouses = computed(() =>
-      baseNodes.value.filter(n => n.entityClass === 'Warehouse').map(n => n.id)
-    );
-
-    const bizInstallSources = computed(() =>
-      baseNodes.value.filter(n => n.entityClass === 'Part').map(n => n.id)
-    );
-
-    const bizInstallTargets = computed(() =>
-      baseNodes.value.filter(n => n.entityClass === 'Vehicle' || n.entityClass === 'Part').map(n => n.id)
-    );
-
-    /**
-     * Central Event Dispatcher (Pure Event Sourcing)
-     * Appends immutable business facts to the event log.
-     */
     function dispatch(event) {
       if (!event) return;
       state.eventLog.push(event);
     }
 
-    // Core Transformation Pipeline: Event Log -> SMIM Canonical Semantic Graph
     const semanticGraph = computed(() => {
-      const opts = {
-        ontology: state.ontology,
-        showHistory: state.showHistory
-      };
-
+      const opts = { ontology: state.ontology, showHistory: state.showHistory };
+      let rawGraph;
       if (state.ontology === 'BFO') {
-        return bfoAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
+        rawGraph = bfoAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
+      } else if (state.ontology === 'ISO15926') {
+        rawGraph = isoAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
+      } else {
+        rawGraph = naiveAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
       }
-      if (state.ontology === 'ISO15926') {
-        return isoAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
-      }
-      return naiveAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
+      return applyQdikwInference(rawGraph, state);
     });
 
-    // Engineer SMRM reduced graph (used for BOM, SMRM view, and installed component discovery)
     const smrmReducedGraph = computed(() => reduceGraphForSMRM(semanticGraph.value));
 
     const installedComponents = computed(() => {
       const comps = new Set();
       smrmReducedGraph.value.edges.forEach(e => {
         if (e.properties?.isCurrent === false) return;
-        if (e.label === 'has_part') {
-          comps.add(e.to);
-        } else if (e.label === 'mounted_in' || e.label === 'stored_at') {
-          comps.add(e.from);
-        }
+        if (e.label === 'has_part') comps.add(e.to);
+        else if (e.label === 'mounted_in' || e.label === 'stored_at') comps.add(e.from);
       });
       return Array.from(comps).filter(id => !id.startsWith('Slot_'));
     });
 
-    // Active Defects List (respecting REVOKE_DEFECT events)
     const activeDefectsList = computed(() => {
       const activeMap = new Map();
-
       state.eventLog.forEach((e, index) => {
         if (e.valid_from !== undefined && e.valid_from > state.currentTime) return;
-
         if (e.type === 'REPORT_DEFECT') {
           if (e.valid_to !== null && e.valid_to !== undefined && e.valid_to <= state.currentTime) return;
           const key = `${e.targetId}::${e.defectName}`;
@@ -251,69 +189,30 @@ const App = {
           activeMap.delete(key);
         }
       });
-
       return Array.from(activeMap.values());
     });
 
-    // Keep select dropdown defaults synchronised with available options
-    watch(bizInstallSources, (sources) => {
-      if (!sources.includes(bizInstSource.value)) bizInstSource.value = sources[0] || '';
-    }, { immediate: true });
-
-    watch(bizInstallTargets, (targets) => {
-      if (!targets.includes(bizInstTarget.value)) bizInstTarget.value = targets[0] || '';
-    }, { immediate: true });
-
-    watch(activeParts, (parts) => {
-      if (!parts.includes(bizStorePart.value)) bizStorePart.value = parts[0] || '';
-    }, { immediate: true });
-
-    watch(activeWarehouses, (warehouses) => {
-      if (!warehouses.includes(bizStoreTarget.value)) bizStoreTarget.value = warehouses[0] || '';
-    }, { immediate: true });
-
-    watch(installedComponents, (comps) => {
-      if (!comps.includes(bizDismPart.value)) bizDismPart.value = comps[0] || '';
-    }, { immediate: true });
-
-    watch(activeDefectsList, (defects) => {
-      if (!defects.some(d => d.id === bizRevDefect.value)) bizRevDefect.value = defects[0]?.id || '';
-    }, { immediate: true });
-
+    watch(bizInstallSources, (sources) => { if (!sources.includes(bizInstSource.value)) bizInstSource.value = sources[0] || ''; }, { immediate: true });
+    watch(bizInstallTargets, (targets) => { if (!targets.includes(bizInstTarget.value)) bizInstTarget.value = targets[0] || ''; }, { immediate: true });
+    watch(activeParts, (parts) => { if (!parts.includes(bizStorePart.value)) bizStorePart.value = parts[0] || ''; }, { immediate: true });
+    watch(activeWarehouses, (warehouses) => { if (!warehouses.includes(bizStoreTarget.value)) bizStoreTarget.value = warehouses[0] || ''; }, { immediate: true });
+    watch(installedComponents, (comps) => { if (!comps.includes(bizDismPart.value)) bizDismPart.value = comps[0] || ''; }, { immediate: true });
+    watch(activeDefectsList, (defects) => { if (!defects.some(d => d.id === bizRevDefect.value)) bizRevDefect.value = defects[0]?.id || ''; }, { immediate: true });
     watch(availableNodes, (nodes) => {
       if (!nodes.includes(bizDefTarget.value)) bizDefTarget.value = nodes[0] || '';
+      if (!nodes.includes(bizDeleteNodeId.value)) bizDeleteNodeId.value = nodes[0] || '';
     }, { immediate: true });
 
-    // Derived Views for Sidebar (URMSM & SMS)
     const bomTrees = computed(() => generateBomTrees(semanticGraph.value));
-
-    const lpgNodeRecords = computed(() => {
-      if (state.storage === 'LPG') {
-        return generateLpgNodeStorage(semanticGraph.value);
-      }
-      return [];
-    });
-
-    const lpgRecords = computed(() => {
-      if (state.storage === 'LPG') {
-        return generateLpgStorage(semanticGraph.value);
-      }
-      return [];
-    });
-
-    const rdfTtl = computed(() => {
-      if (state.storage === 'RDF') {
-        return generateRdfStorage(semanticGraph.value);
-      }
-      return '';
-    });
+    const lpgNodeRecords = computed(() => state.storage === 'LPG' ? generateLpgNodeStorage(semanticGraph.value) : []);
+    const lpgRecords = computed(() => state.storage === 'LPG' ? generateLpgStorage(semanticGraph.value) : []);
+    const rdfTtl = computed(() => state.storage === 'RDF' ? generateRdfStorage(semanticGraph.value) : '');
 
     function formatProperties(props) {
       if (!props) return '';
       const entries = Object.entries(props).filter(
         ([key, val]) => !INTERNAL_PROPERTY_KEYS.includes(key) || key === 'validFrom' || key === 'validTo' || key === 'atTime'
-          ? (key !== 'isCurrent' && val !== undefined)
-          : false
+          ? (key !== 'isCurrent' && val !== undefined) : false
       );
       if (entries.length === 0) return '';
       return entries.map(([k, v]) => {
@@ -323,68 +222,45 @@ const App = {
     }
 
     const queryCode = computed(() => {
-      if (state.storage === 'LPG') {
-        return generateLpgQuery(semanticGraph.value, state.currentTime, state.ontology);
-      }
+      if (state.storage === 'LPG') return generateLpgQuery(semanticGraph.value, state.currentTime, state.ontology);
       return generateRdfQuery(semanticGraph.value, state.currentTime, state.ontology);
     });
 
-    const liveQueryResult = computed(() =>
-      evaluateLiveQuery(semanticGraph.value, state.currentTime, state.ontology)
-    );
+    const liveQueryResult = computed(() => evaluateLiveQuery(semanticGraph.value, state.currentTime, state.ontology));
 
-    // Route active graph to canvas based on the 4 unified Perspectives
     const activeGraph = computed(() => {
-      if (state.perspective === 'SMS_LPG') {
-        return generatePhysicalGraph(semanticGraph.value, 'LPG');
-      }
-      if (state.perspective === 'SMS_RDF') {
-        return generatePhysicalGraph(semanticGraph.value, 'RDF');
-      }
-      if (state.perspective === 'SMRM') {
-        return smrmReducedGraph.value;
-      }
+      if (state.perspective === 'SMS_LPG') return generatePhysicalGraph(semanticGraph.value, 'LPG');
+      if (state.perspective === 'SMS_RDF') return generatePhysicalGraph(semanticGraph.value, 'RDF');
+      if (state.perspective === 'SMRM') return smrmReducedGraph.value;
       return semanticGraph.value;
     });
 
-    // Reactive Graph Caption (truthful to the active perspective)
     const graphCaption = computed(() => {
       let ontoText = 'BFO (3D)';
       if (state.ontology === 'ISO15926') ontoText = 'ISO 15926 (4D)';
       if (state.ontology === 'NAIVE_NODE') ontoText = t.value.ontoNaiveNode;
       if (state.ontology === 'NAIVE_EDGE') ontoText = t.value.ontoNaiveEdge;
-
       let viewText = t.value.viewLogicalCaption;
       if (state.perspective === 'SMRM') viewText = t.value.viewSmrmCaption;
       if (state.perspective === 'SMS_LPG') viewText = t.value.viewPhysicalLpgCaption;
       if (state.perspective === 'SMS_RDF') viewText = t.value.viewPhysicalRdfCaption;
-
       return `${ontoText} | ${viewText}`;
     });
 
-    // Contextual Dynamic Legend matching the rendered canvas
     const graphLegendItems = computed(() => {
-      const nodes = [];
-      const edges = [];
-      const dict = t.value.legend;
-
+      const nodes = []; const edges = []; const dict = t.value.legend;
       if (state.perspective === 'SMRM' || state.ontology === 'NAIVE_NODE' || state.ontology === 'NAIVE_EDGE') {
         nodes.push({ id: 'naiveVehicle', label: dict.naiveVehicle, swatch: 'swatch-box-vehicle' });
-        if (state.perspective !== 'SMRM') {
-          nodes.push({ id: 'naiveSlot', label: dict.naiveSlot, swatch: 'swatch-box-slot' });
-        }
+        if (state.perspective !== 'SMRM') nodes.push({ id: 'naiveSlot', label: dict.naiveSlot, swatch: 'swatch-box-slot' });
         nodes.push({ id: 'naivePart', label: dict.naivePart, swatch: 'swatch-box-part' });
         nodes.push({ id: 'naiveDefect', label: dict.naiveDefect, swatch: 'swatch-diamond-defect' });
         nodes.push({ id: 'naiveWarehouse', label: dict.naiveWarehouse, swatch: 'swatch-box-warehouse' });
-
         if (state.perspective === 'SMS_RDF') {
           nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-diamond' });
           nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
           edges.push({ id: 'rdfPred', label: dict.rdfPred, swatch: 'swatch-line-past' });
         } else {
-          if (state.perspective !== 'SMRM') {
-            edges.push({ id: 'relHasSlot', label: dict.relHasSlot, swatch: 'swatch-line-slot' });
-          }
+          if (state.perspective !== 'SMRM') edges.push({ id: 'relHasSlot', label: dict.relHasSlot, swatch: 'swatch-line-slot' });
           edges.push({ id: 'relMountedIn', label: dict.relMountedIn, swatch: 'swatch-line-mount' });
           edges.push({ id: 'relStoredAt', label: dict.relStoredAt, swatch: 'swatch-line-store' });
           edges.push({ id: 'relHasDefect', label: dict.relHasDefect, swatch: 'swatch-line-defect' });
@@ -392,8 +268,8 @@ const App = {
       } else if (state.ontology === 'BFO') {
         nodes.push({ id: 'bfoSys', label: dict.bfoSys, swatch: 'swatch-box-sys' });
         nodes.push({ id: 'bfoElem', label: dict.bfoElem, swatch: 'swatch-box-elem' });
+        nodes.push({ id: 'bfoSlot', label: 'BFO:Site (Functional Slot)', swatch: 'swatch-box-slot' });
         nodes.push({ id: 'bfoQuality', label: dict.bfoQuality, swatch: 'swatch-diamond' });
-
         if (state.perspective === 'SMS_RDF') {
           nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-diamond' });
           nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
@@ -401,33 +277,22 @@ const App = {
         } else {
           edges.push({ id: 'bfoActive', label: dict.bfoActiveEdge, swatch: 'swatch-line-active' });
           edges.push({ id: 'bfoInheres', label: dict.bfoInheres, swatch: 'swatch-line-transition' });
-          if (state.showHistory) {
-            edges.push({ id: 'bfoPast', label: dict.bfoPastEdge, swatch: 'swatch-line-past' });
-          }
+          if (state.showHistory) edges.push({ id: 'bfoPast', label: dict.bfoPastEdge, swatch: 'swatch-line-past' });
         }
       } else {
         nodes.push({ id: 'iso4d', label: dict.iso4d, swatch: 'swatch-box-4d' });
         nodes.push({ id: 'isoState', label: dict.isoState, swatch: 'swatch-box-state' });
         nodes.push({ id: 'isoDefect', label: dict.isoDefect, swatch: 'swatch-diamond-defect' });
-        if (state.perspective === 'SMS_RDF') {
-          nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
-        }
+        if (state.perspective === 'SMS_RDF') nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
         edges.push({ id: 'isoPart', label: dict.isoPartRel, swatch: 'swatch-line-active' });
         edges.push({ id: 'isoSlice', label: dict.isoSliceRel, swatch: 'swatch-line-past' });
         edges.push({ id: 'isoDefectRel', label: dict.isoDefectRel, swatch: 'swatch-line-defect' });
-
-        if (state.perspective === 'SMS_LPG') {
-          edges.push({ id: 'isoTrans', label: dict.isoTransitionRel, swatch: 'swatch-line-transition' });
-        }
+        if (state.perspective === 'SMS_LPG') edges.push({ id: 'isoTrans', label: dict.isoTransitionRel, swatch: 'swatch-line-transition' });
       }
-
       return { nodes, edges };
     });
 
-    // Re-render canvas when activeGraph or engine changes
-    watch([activeGraph, () => state.graphEngine], () => {
-      renderGraph();
-    }, { deep: true });
+    watch([activeGraph, () => state.graphEngine], () => { renderGraph(); }, { deep: true });
 
     function renderGraph() {
       if (state.currentView === 'MENU') return;
@@ -444,6 +309,8 @@ const App = {
       state.eventLog.splice(0, state.eventLog.length);
       state.currentTime = 0;
       state.edgeSequence = 1;
+      state.qdikw.active = false;
+      state.figureOverlay.visible = false;
       dispatch(createRegisterPartEvent('System_A', 0, 'Vehicle', nextSequence()));
       dispatch(createRegisterPartEvent('SubAssembly_1', 0, 'Part', nextSequence()));
       dispatch(createAssembleEvent('System_A', 'SubAssembly_1', 'mounted_in', 0, nextSequence()));
@@ -459,13 +326,21 @@ const App = {
       state.eventLog.splice(0, state.eventLog.length);
       state.currentTime = 0;
       state.ontology = 'NAIVE_NODE';
+      state.qdikw.active = false;
+      state.figureOverlay.visible = false;
 
       if (activeScenarioId.value === 'SANDBOX_TOUR') {
         resetSandboxTourTimeline(0);
         setPerspective('SMRM');
-        state.graphEngine = 'VIS';
+        state.graphEngine = 'MERMAID';
         audioDuration.value = sandboxTourScenario.fallbackDuration;
         onSandboxTourTimeUpdate(0, state, renderGraph);
+      } else if (activeScenarioId.value === 'QDIKW_PIPELINE') {
+        resetQdikwTimeline(0);
+        setPerspective('SMRM');
+        state.graphEngine = 'MERMAID';
+        audioDuration.value = qdikwScenario.fallbackDuration;
+        onQdikwTimeUpdate(0, state, renderGraph, null);
       } else {
         resetVanishingCrackTimeline(0);
         setPerspective('SMIM');
@@ -476,7 +351,7 @@ const App = {
     function launchScenario(scenarioId) {
       activeScenarioId.value = scenarioId;
       stopAudio(false);
-      if ( state.currentView === 'SCENARIO' ) {
+      if (state.currentView === 'SCENARIO') {
         resetActiveScenarioState();
         nextTick(() => renderGraph());
       } else {
@@ -484,11 +359,36 @@ const App = {
       }
     }
 
-    // Watch for view transitions (MENU vs SANDBOX vs SCENARIO)
-    watch(() => state.currentView, async (newView) => {
-      if (newView !== 'SCENARIO') {
-        stopAudio(false);
+    /**
+     * Interactive Chapter Navigation for Q-D-I-K-W Pills
+     */
+    function jumpToQdikwStage(stageKey) {
+      const targetTime = QDIKW_STAGE_TIMESTAMPS[stageKey];
+      if (targetTime === undefined) return;
+      if (scenarioAudio.value && !usingVirtualTimer.value) {
+        scenarioAudio.value.currentTime = targetTime;
       }
+      audioCurrentTime.value = targetTime;
+      resetActiveScenarioState();
+      processTimelineAt(targetTime);
+    }
+
+    function toggleSlotRegime() {
+      if (!state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION) {
+        state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION = {
+          loadRegime: 'DYNAMIC_CYCLIC',
+          safetyFunction: 'STEERING_CONTROL'
+        };
+      } else {
+        const cur = state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION.loadRegime;
+        state.qdikw.slotMetadata.SLOT_FRONT_SUSPENSION.loadRegime =
+          cur === 'DYNAMIC_CYCLIC' ? 'STATIC_LOAD' : 'DYNAMIC_CYCLIC';
+      }
+      renderGraph();
+    }
+
+    watch(() => state.currentView, async (newView) => {
+      if (newView !== 'SCENARIO') stopAudio(false);
       if (newView === 'SCENARIO') {
         resetActiveScenarioState();
       } else if (newView === 'SANDBOX' && state.eventLog.length === 0) {
@@ -496,9 +396,7 @@ const App = {
       }
       if (newView !== 'MENU') {
         await nextTick();
-        if (visContainer.value) {
-          initVisNetwork(visContainer.value);
-        }
+        if (visContainer.value) initVisNetwork(visContainer.value);
         renderGraph();
       }
     });
@@ -512,19 +410,15 @@ const App = {
     });
 
     function clearVirtualTimer() {
-      if (virtualTimerInterval) {
-        clearInterval(virtualTimerInterval);
-        virtualTimerInterval = null;
-      }
+      if (virtualTimerInterval) { clearInterval(virtualTimerInterval); virtualTimerInterval = null; }
     }
 
     function startVirtualTimer() {
       clearVirtualTimer();
       usingVirtualTimer.value = true;
       isPlaying.value = true;
-      if (!audioDuration.value) {
-        audioDuration.value = activeScenarioObj.value.fallbackDuration || 108;
-      }
+      if (!audioDuration.value) audioDuration.value = activeScenarioObj.value.fallbackDuration || 108;
+
       virtualTimerInterval = setInterval(() => {
         if (audioCurrentTime.value < audioDuration.value) {
           audioCurrentTime.value = Math.min(audioDuration.value, audioCurrentTime.value + 0.25);
@@ -539,21 +433,17 @@ const App = {
     function goHome() {
       stopAudio(false);
       state.currentView = 'MENU';
+      state.qdikw.active = false;
+      state.figureOverlay.visible = false;
       state.eventLog.splice(0, state.eventLog.length);
       state.currentTime = 0;
       state.edgeSequence = 1;
     }
 
     function playAudio() {
-      if (usingVirtualTimer.value) {
-        startVirtualTimer();
-        return;
-      }
+      if (usingVirtualTimer.value) { startVirtualTimer(); return; }
       if (scenarioAudio.value) {
-        scenarioAudio.value.play().catch(() => {
-          // If MP3 file is not recorded yet, seamlessly fall back to virtual timer
-          startVirtualTimer();
-        });
+        scenarioAudio.value.play().catch(() => { startVirtualTimer(); });
       } else {
         startVirtualTimer();
       }
@@ -562,17 +452,11 @@ const App = {
     function pauseAudio() {
       clearVirtualTimer();
       isPlaying.value = false;
-      if (scenarioAudio.value && !usingVirtualTimer.value) {
-        scenarioAudio.value.pause();
-      }
+      if (scenarioAudio.value && !usingVirtualTimer.value) scenarioAudio.value.pause();
     }
 
     function togglePlayAudio() {
-      if (isPlaying.value) {
-        pauseAudio();
-      } else {
-        playAudio();
-      }
+      if (isPlaying.value) pauseAudio(); else playAudio();
     }
 
     function stopAudio(resetScenarioGraph = true) {
@@ -585,25 +469,29 @@ const App = {
       isPlaying.value = false;
       audioCurrentTime.value = 0;
       currentSubtitleText.value = '';
-      resetSandboxTourTimeline(0);
+
+      if (activeScenarioId.value === 'SANDBOX_TOUR') resetSandboxTourTimeline(0);
+      else if (activeScenarioId.value === 'QDIKW_PIPELINE') resetQdikwTimeline(0);
 
       if (resetScenarioGraph) {
         resetActiveScenarioState();
-        nextTick(() => {
-          renderGraph();
-        });
+        nextTick(() => { renderGraph(); });
       }
     }
 
     function processTimelineAt(currentTime) {
       const scenario = activeScenarioObj.value;
-      const activeSubtitle = scenario.subtitles.find(
-        sub => currentTime >= sub.start && currentTime <= sub.end
-      );
+      const activeSubtitle = scenario.subtitles.find(sub => currentTime >= sub.start && currentTime <= sub.end);
       currentSubtitleText.value = activeSubtitle ? activeSubtitle.text : '';
+
+      const uiRefs = {
+        bizRegType, bizRegId, bizInstSource, bizInstTarget, bizDefTarget, bizDefType, bizDefVal
+      };
 
       if (activeScenarioId.value === 'SANDBOX_TOUR') {
         onSandboxTourTimeUpdate(currentTime, state, renderGraph);
+      } else if (activeScenarioId.value === 'QDIKW_PIPELINE') {
+        onQdikwTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else {
         dispatchVanishingCrackTimeline(currentTime, state, renderGraph);
       }
@@ -611,9 +499,7 @@ const App = {
 
     function onTimeUpdate() {
       if (usingVirtualTimer.value) return;
-      if (scenarioAudio.value) {
-        audioCurrentTime.value = scenarioAudio.value.currentTime;
-      }
+      if (scenarioAudio.value) audioCurrentTime.value = scenarioAudio.value.currentTime;
       processTimelineAt(audioCurrentTime.value);
     }
 
@@ -632,11 +518,8 @@ const App = {
 
     function onSeek(event) {
       const targetTime = parseFloat(event.target.value);
-      if (scenarioAudio.value && !usingVirtualTimer.value) {
-        scenarioAudio.value.currentTime = targetTime;
-      }
+      if (scenarioAudio.value && !usingVirtualTimer.value) scenarioAudio.value.currentTime = targetTime;
       audioCurrentTime.value = targetTime;
-
       resetActiveScenarioState();
       processTimelineAt(targetTime);
     }
@@ -648,222 +531,146 @@ const App = {
       return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
-    // Engineer Domain Actions
     function handleBizRegister() {
       if (!bizRegId.value) return;
-      const event = createRegisterPartEvent(
-        bizRegId.value,
-        state.currentTime,
-        bizRegType.value,
-        nextSequence()
-      );
-      if (event) {
-        dispatch(event);
-        bizRegId.value = '';
-      }
+      const event = createRegisterPartEvent(bizRegId.value, state.currentTime, bizRegType.value, nextSequence());
+      if (event) { dispatch(event); bizRegId.value = ''; }
     }
 
     function handleBizInstall() {
       if (!bizInstSource.value || !bizInstTarget.value) return;
       if (bizInstSource.value === bizInstTarget.value) return;
-
-      const event = createAssembleEvent(
-        bizInstTarget.value,
-        bizInstSource.value,
-        'mounted_in',
-        state.currentTime,
-        nextSequence()
-      );
+      // Automatically dismantle from warehouse/previous location before installing
+      if (installedComponents.value.includes(bizInstSource.value)) {
+        dispatch(createDismantleEvent(bizInstSource.value, state.currentTime, nextSequence()));
+      }
+      const event = createAssembleEvent(bizInstTarget.value, bizInstSource.value, 'mounted_in', state.currentTime, nextSequence());
       if (event) dispatch(event);
     }
 
     function handleBizReportDefect() {
       if (!bizDefTarget.value || !bizDefType.value) return;
-      const event = createReportDefectEvent(
-        bizDefTarget.value,
-        bizDefType.value,
-        bizDefVal.value || 'present',
-        state.currentTime,
-        nextSequence()
-      );
-      if (event) {
-        dispatch(event);
-        bizDefType.value = '';
-        bizDefVal.value = '';
-      }
+      const event = createReportDefectEvent(bizDefTarget.value, bizDefType.value, bizDefVal.value || 'present', state.currentTime, nextSequence());
+      if (event) { dispatch(event); bizDefType.value = ''; bizDefVal.value = ''; }
     }
 
     function handleBizRevokeDefect() {
       if (!bizRevDefect.value) return;
       const item = activeDefectsList.value.find(d => d.id === bizRevDefect.value);
       if (item) {
-        const event = createRevokeDefectEvent(
-          item.targetId,
-          item.defectName,
-          state.currentTime,
-          item.id,
-          nextSequence()
-        );
-        if (event) {
-          dispatch(event);
-          bizRevDefect.value = '';
-        }
+        const event = createRevokeDefectEvent(item.targetId, item.defectName, state.currentTime, item.id, nextSequence());
+        if (event) { dispatch(event); bizRevDefect.value = ''; }
       }
     }
 
     function handleBizDismantle() {
       if (!bizDismPart.value) return;
-      const event = createDismantleEvent(
-        bizDismPart.value,
-        state.currentTime,
-        nextSequence()
-      );
-      if (event) {
-        dispatch(event);
-        bizDismPart.value = '';
+      const event = createDismantleEvent(bizDismPart.value, state.currentTime, nextSequence());
+      if (event) { dispatch(event); bizDismPart.value = ''; }
+    }
+
+    /**
+     * Completely deletes a node and its associated events from the repository (Point 9)
+     */
+    function handleBizDeleteNode() {
+      const target = bizDeleteNodeId.value;
+      if (!target) return;
+      for (let i = state.eventLog.length - 1; i >= 0; i--) {
+        const ev = state.eventLog[i];
+        if (ev.partId === target || ev.parentId === target || ev.childId === target || ev.targetId === target) {
+          state.eventLog.splice(i, 1);
+        }
       }
+      renderGraph();
     }
 
     function handleBizStore() {
       if (!bizStorePart.value || !bizStoreTarget.value) return;
-      const event = createAssembleEvent(
-        bizStoreTarget.value,
-        bizStorePart.value,
-        'stored_at',
-        state.currentTime,
-        nextSequence()
-      );
+      if (installedComponents.value.includes(bizStorePart.value)) {
+        dispatch(createDismantleEvent(bizStorePart.value, state.currentTime, nextSequence()));
+      }
+      const event = createAssembleEvent(bizStoreTarget.value, bizStorePart.value, 'stored_at', state.currentTime, nextSequence());
       if (event) dispatch(event);
     }
 
-    // Resizer Handlers with active .dragging visual feedback
     function startResizeH(e) {
-      const resizerEl = e.currentTarget;
-      resizerEl?.classList.add('dragging');
-      const startX = e.clientX;
-      const startWidth = layout.leftWidth;
+      const resizerEl = e.currentTarget; resizerEl?.classList.add('dragging');
+      const startX = e.clientX; const startWidth = layout.leftWidth;
       const containerWidth = document.querySelector('.main-container').getBoundingClientRect().width;
-
       const onMouseMove = (evt) => {
         const newWidth = startWidth + ((evt.clientX - startX) / containerWidth) * 100;
         if (newWidth > 25 && newWidth < 78) layout.leftWidth = newWidth;
       };
-
       const onMouseUp = () => {
         resizerEl?.classList.remove('dragging');
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
         document.body.classList.remove('no-select');
       };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
       document.body.classList.add('no-select');
     }
 
     function startResizeV(e, property, containerSelector) {
-      const resizerEl = e.currentTarget;
-      resizerEl?.classList.add('dragging');
-      const startY = e.clientY;
-      const startHeight = layout[property];
+      const resizerEl = e.currentTarget; resizerEl?.classList.add('dragging');
+      const startY = e.clientY; const startHeight = layout[property];
       const containerHeight = document.querySelector(containerSelector).getBoundingClientRect().height;
-
       const onMouseMove = (evt) => {
         const newHeight = startHeight + ((evt.clientY - startY) / containerHeight) * 100;
         if (newHeight > 12 && newHeight < 75) layout[property] = newHeight;
       };
-
       const onMouseUp = () => {
         resizerEl?.classList.remove('dragging');
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
         document.body.classList.remove('no-select');
       };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
       document.body.classList.add('no-select');
     }
 
-    // Full JSON State Export & Import
     function saveJson() {
       const exportData = {
-        version: '2.0',
-        savedAt: new Date().toISOString(),
-        userRole: state.userRole,
-        ontology: state.ontology,
-        perspective: state.perspective,
-        storage: state.storage,
-        graphEngine: state.graphEngine,
-        language: state.language,
-        showHistory: state.showHistory,
-        currentTime: state.currentTime,
-        edgeSequence: state.edgeSequence,
+        version: '2.0', savedAt: new Date().toISOString(), userRole: state.userRole, ontology: state.ontology,
+        perspective: state.perspective, storage: state.storage, graphEngine: state.graphEngine, language: state.language,
+        showHistory: state.showHistory, currentTime: state.currentTime, edgeSequence: state.edgeSequence,
         eventLog: JSON.parse(JSON.stringify(state.eventLog))
       };
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url;
       a.download = `workbench-state-t${state.currentTime}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     }
 
-    function triggerLoadJson() {
-      if (fileInput.value) {
-        fileInput.value.value = '';
-        fileInput.value.click();
-      }
-    }
-
+    function triggerLoadJson() { if (fileInput.value) { fileInput.value.value = ''; fileInput.value.click(); } }
     function onFileLoaded(e) {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
+      const file = e.target.files?.[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
           const parsed = JSON.parse(event.target.result);
-          if (Array.isArray(parsed)) {
-            loadState({ eventLog: parsed });
-          } else if (parsed && typeof parsed === 'object') {
-            loadState(parsed);
-          }
-          nextTick(() => {
-            renderGraph();
-          });
-        } catch (err) {
-          console.error('Failed to parse state JSON:', err);
-          alert('Invalid JSON file format.');
-        }
+          if (Array.isArray(parsed)) loadState({ eventLog: parsed });
+          else if (parsed && typeof parsed === 'object') loadState(parsed);
+          nextTick(() => { renderGraph(); });
+        } catch (err) { console.error('Failed to parse state JSON:', err); alert('Invalid JSON file format.'); }
       };
       reader.readAsText(file);
     }
 
     return {
-      state, t, layout, advanceTime, setPerspective, dispatch,
-      fileInput, saveJson, triggerLoadJson, onFileLoaded,
-      entityClasses: ENTITY_CLASSES,
-      relationTypes: RELATION_TYPES,
-      availableNodes, goHome, launchScenario, activeScenarioId, activeAudioSrc,
-      activeParts, activeWarehouses,
-      bizRegType, bizRegId, handleBizRegister,
+      state, t, layout, advanceTime, setPerspective, dispatch, semanticGraph,
+      fileInput, saveJson, triggerLoadJson, onFileLoaded, renderGraph,
+      entityClasses: ENTITY_CLASSES, relationTypes: RELATION_TYPES, availableNodes, goHome,
+      launchScenario, jumpToQdikwStage, toggleSlotRegime, activeScenarioId, activeAudioSrc,
+      activeParts, activeWarehouses, bizRegType, bizRegId, handleBizRegister,
       bizInstSource, bizInstTarget, handleBizInstall, bizInstallSources, bizInstallTargets,
       bizDefTarget, bizDefType, bizDefVal, handleBizReportDefect,
       bizRevDefect, handleBizRevokeDefect, activeDefectsList,
       bizDismPart, handleBizDismantle, installedComponents,
+      bizDeleteNodeId, handleBizDeleteNode,
       bizStorePart, bizStoreTarget, handleBizStore,
-      bomTrees, lpgNodeRecords, lpgRecords, rdfTtl, formatProperties,
-      queryCode, liveQueryResult,
-      visContainer, mermaidContainer,
-      graphCaption, graphLegendItems,
-      startResizeH, startResizeV,
-      scenarioAudio, isPlaying, audioCurrentTime, audioDuration,
-      showSubtitles, currentSubtitleText,
-      playAudio, pauseAudio, togglePlayAudio, stopAudio,
+      bomTrees, lpgNodeRecords, lpgRecords, rdfTtl, formatProperties, queryCode, liveQueryResult,
+      visContainer, mermaidContainer, graphCaption, graphLegendItems,
+      startResizeH, startResizeV, scenarioAudio, isPlaying, audioCurrentTime, audioDuration,
+      showSubtitles, currentSubtitleText, playAudio, pauseAudio, togglePlayAudio, stopAudio,
       onTimeUpdate, onLoadedMetadata, onAudioEnded, onSeek, formatTime
     };
   },
@@ -887,6 +694,11 @@ const App = {
             <span class="btn-sub-text">Guided walkthrough: from real-world queries to knowledge, live sandbox actions &amp; ontologies</span>
           </button>
 
+          <button class="menu-btn menu-btn-scenario" @click="launchScenario('QDIKW_PIPELINE')">
+            <span class="btn-main-text">🧠 The Q-D-I-K-W Pipeline (Roles &amp; Rules)</span>
+            <span class="btn-sub-text">From Question to Wisdom: Explaining role separation, modular inference &amp; blind spots</span>
+          </button>
+
           <button class="menu-btn menu-btn-scenario" @click="launchScenario('VANISHING_CRACK')">
             <span class="btn-main-text">Scenario: The Vanishing Crack</span>
             <span class="btn-sub-text">Guided demonstration of temporal defect tracing across lifecycle states</span>
@@ -895,9 +707,94 @@ const App = {
       </div>
     </div>
 
+    <!-- Fullscreen Narrative Figure Overlay -->
+    <div v-if="state.figureOverlay?.visible" class="figure-modal-overlay">
+      <div class="figure-modal-card">
+        <button class="figure-modal-close" @click="state.figureOverlay.visible = false">Close</button>
+        <img :src="state.figureOverlay.src" class="figure-modal-img" alt="Narrative Figure" />
+        <div class="figure-modal-caption">{{ state.figureOverlay.caption }}</div>
+        <div class="figure-modal-attribution" v-html="state.figureOverlay.attributionHtml"></div>
+      </div>
+    </div>
+
     <!-- Main Sandbox & Scenario Workspace -->
     <div v-if="state.currentView !== 'MENU'" class="sandbox-workspace">
       <div class="control-deck">
+
+        <!-- QDIKW Stage & Role Banner (Clickable Chapter Navigation!) -->
+        <div id="qdikw-stage-bar" v-if="state.qdikw?.active" class="qdikw-banner">
+          <div class="qdikw-steps">
+            <span
+              id="qdikw-step-Q"
+              class="qdikw-step-pill"
+              :class="{active: state.qdikw.stage === 'Q' || state.qdikw.stage === 'INTRO'}"
+              title="Click to jump to Stage 1: Question (01:02)"
+              @click="jumpToQdikwStage('Q')"
+            >Q - Question</span>
+            <span
+              id="qdikw-step-D"
+              class="qdikw-step-pill"
+              :class="{active: state.qdikw.stage === 'D'}"
+              title="Click to jump to Stage 2: Data (02:08)"
+              @click="jumpToQdikwStage('D')"
+            >D - Data</span>
+            <span
+              id="qdikw-step-I"
+              class="qdikw-step-pill"
+              :class="{active: state.qdikw.stage === 'I'}"
+              title="Click to jump to Stage 3: Information (03:09)"
+              @click="jumpToQdikwStage('I')"
+            >I - Information</span>
+            <span
+              id="qdikw-step-K"
+              class="qdikw-step-pill"
+              :class="{active: state.qdikw.stage === 'K'}"
+              title="Click to jump to Stage 4: Knowledge (04:56)"
+              @click="jumpToQdikwStage('K')"
+            >K - Knowledge</span>
+            <span
+              id="qdikw-step-W"
+              class="qdikw-step-pill"
+              :class="{active: state.qdikw.stage === 'W'}"
+              title="Click to jump to Stage 5: Wisdom (06:33)"
+              @click="jumpToQdikwStage('W')"
+            >W - Wisdom</span>
+          </div>
+          <div class="qdikw-role-box" v-if="state.qdikw.activeRole">
+            <span class="qdikw-role-name">{{ state.qdikw.activeRole }}</span>
+            <span class="qdikw-role-desc">{{ state.qdikw.roleBadge }}</span>
+          </div>
+        </div>
+
+        <!-- Semantic Rules Toolbar (Interactive checkboxes) -->
+        <div id="qdikw-rules-bar" v-if="state.qdikw?.active" class="smrm-rules-row">
+          <span style="color:#4c1d95; font-weight:700; margin-right: 8px;">🧠 SMRM Rules:</span>
+          <label id="qdikw-rule-1" class="rule-chip" :class="{active: state.qdikw.rules.rule1}">
+            <input type="checkbox" v-model="state.qdikw.rules.rule1" @change="renderGraph" style="display:none;">
+            [1] Context Inheritance (Slot &rarr; Stress)
+          </label>
+          <label id="qdikw-rule-2" class="rule-chip" :class="{active: state.qdikw.rules.rule2}">
+            <input type="checkbox" v-model="state.qdikw.rules.rule2" @change="renderGraph" style="display:none;">
+            [2] Material Physics (Crack &gt; 10mm &rarr; Fracture)
+          </label>
+          <label id="qdikw-rule-3" class="rule-chip" :class="{active: state.qdikw.rules.rule3}">
+            <input type="checkbox" v-model="state.qdikw.rules.rule3" @change="renderGraph" style="display:none;">
+            [3] Functional Safety (Fracture &rarr; Loss of Control)
+          </label>
+
+          <div id="qdikw-slot-config" style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+            <span style="font-weight: 600;">Suspension Slot Regime:</span>
+            <button
+              class="rule-chip"
+              :class="{active: state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime === 'DYNAMIC_CYCLIC'}"
+              @click="toggleSlotRegime"
+              title="Click to toggle slot regime between DYNAMIC_CYCLIC and STATIC_LOAD"
+            >
+              {{ state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime || 'No Load Defined (Click to Set)' }}
+            </button>
+          </div>
+        </div>
+
         <!-- Tier 1: Unified Architecture & Perspective Controls -->
         <div class="deck-row deck-row-top">
           <div class="section-label">
@@ -913,7 +810,6 @@ const App = {
 
           <div class="divider"></div>
 
-          <!-- Unified 4-Perspective Switcher (SMRM | SMIM | SMS_LPG | SMS_RDF) -->
           <div class="section-label">
             <span class="iec-badge">IEC 63339<span class="iec-tooltip" v-html="t.tooltips.sms"></span></span>
             <span>👁️ {{ t.viewTitle }}</span>
@@ -935,7 +831,6 @@ const App = {
 
           <div class="divider"></div>
 
-          <!-- JSON State Operations -->
           <button id="ctrl-save-json" class="secondary" @click="saveJson" :title="t.saveBtn">{{ t.saveBtn }}</button>
           <button id="ctrl-load-json" class="secondary" @click="triggerLoadJson" :title="t.loadBtn">{{ t.loadBtn }}</button>
           <input ref="fileInput" type="file" accept=".json" style="display: none;" @change="onFileLoaded" />
@@ -949,17 +844,17 @@ const App = {
 
         <!-- Tier 2: Engineer Lifecycle Actions -->
         <template v-if="state.userRole === 'UNI_ENGINEER'">
-          <!-- Row 1: Time, Register, Install, Dismantle -->
+          <!-- Row 1: Time, Register, Install, Dismantle, Delete -->
           <div class="deck-row">
             <span id="biz-time-badge" class="badge">T = {{ state.currentTime }}</span>
             <button id="biz-step-btn" @click="advanceTime">{{ t.stepBtn }}</button>
 
             <div class="divider"></div>
 
-            <!-- Action 1: Register Entity -->
             <label class="action-label">1. Register:</label>
             <select id="biz-reg-type" v-model="bizRegType" title="Entity Class">
               <option value="Vehicle">Vehicle</option>
+              <option value="Slot">Slot</option>
               <option value="Part">Part</option>
               <option value="Warehouse">Warehouse</option>
             </select>
@@ -968,7 +863,6 @@ const App = {
 
             <div class="divider"></div>
 
-            <!-- Action 2: Install / Assemble -->
             <label class="action-label">2. Install:</label>
             <select id="biz-inst-source" v-model="bizInstSource" title="Component to install">
               <option v-for="node in bizInstallSources" :key="'src_' + node" :value="node">{{ node }}</option>
@@ -981,28 +875,33 @@ const App = {
 
             <div class="divider"></div>
 
-            <!-- Action 5: Dismantle -->
             <label class="action-label">5. Dismantle:</label>
             <select id="biz-dism-part" v-model="bizDismPart">
               <option v-for="comp in installedComponents" :key="'comp_' + comp" :value="comp">{{ comp }}</option>
             </select>
             <button id="biz-dism-btn" class="danger" @click="handleBizDismantle">Dismantle</button>
+
+            <div class="divider"></div>
+
+            <label class="action-label">Delete:</label>
+            <select id="biz-del-node" v-model="bizDeleteNodeId" title="Delete entity completely">
+              <option v-for="node in availableNodes" :key="'del_' + node" :value="node">{{ node }}</option>
+            </select>
+            <button id="biz-del-btn" class="danger" @click="handleBizDeleteNode" title="Delete selected entity">🗑️</button>
           </div>
 
           <!-- Row 2: Defect, Revoke, Storage, History -->
           <div class="deck-row" style="border-top: 1px solid #f1f5f9; background: #fafafa;">
-            <!-- Action 3: Report Defect -->
             <label class="action-label">3. Defect:</label>
             <select id="biz-def-target" v-model="bizDefTarget">
               <option v-for="node in availableNodes" :key="'dn_' + node" :value="node">{{ node }}</option>
             </select>
             <input id="biz-def-type" type="text" v-model="bizDefType" placeholder="Type (e.g. crack)" style="width: 110px;">
-            <input id="biz-def-val" type="text" v-model="bizDefVal" placeholder="Value (e.g. 2mm)" style="width: 85px;">
+            <input id="biz-def-val" type="text" v-model="bizDefVal" placeholder="Value (e.g. 15mm)" style="width: 85px;">
             <button id="biz-def-btn" class="secondary" @click="handleBizReportDefect">Report Defect</button>
 
             <div class="divider"></div>
 
-            <!-- Action 4: Revoke Defect -->
             <label class="action-label">4. Revoke:</label>
             <select id="biz-rev-defect" v-model="bizRevDefect">
               <option v-for="d in activeDefectsList" :key="d.id" :value="d.id">{{ d.label }}</option>
@@ -1011,7 +910,6 @@ const App = {
 
             <div class="divider"></div>
 
-            <!-- Action 6: Move to Storage -->
             <label class="action-label">6. Storage:</label>
             <select id="biz-store-part" v-model="bizStorePart">
               <option v-for="part in activeParts" :key="'sp_' + part" :value="part">{{ part }}</option>
@@ -1024,7 +922,6 @@ const App = {
 
             <div class="divider"></div>
 
-            <!-- History Checkbox -->
             <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
               <input type="checkbox" v-model="state.showHistory"> {{ t.history }}
             </label>
@@ -1037,13 +934,11 @@ const App = {
           <div ref="visContainer" id="vis-container" v-show="state.graphEngine === 'VIS'"></div>
           <div ref="mermaidContainer" id="mermaid-container" v-show="state.graphEngine === 'MERMAID'"></div>
 
-          <!-- Dynamic Graph Caption Overlay -->
           <div class="graph-caption">
             <span>📌</span>
             <span>{{ graphCaption }}</span>
           </div>
 
-          <!-- Contextual Dynamic Legend Overlay -->
           <div class="graph-legend">
             <div class="legend-title">
               <span>{{ t.legend.title }}</span>
@@ -1065,7 +960,6 @@ const App = {
           </div>
         </div>
 
-        <!-- Horizontal Resizer -->
         <div class="resizer" id="panel-resizer" @mousedown="startResizeH"></div>
 
         <div class="sidebar" style="flex: 1;">
@@ -1100,7 +994,6 @@ const App = {
             </h4>
             <div id="storage-content" class="card-scroll-body">
               <template v-if="state.storage === 'LPG'">
-                <!-- Node Store Table -->
                 <div class="store-sub-header">{{ t.nodeStoreTitle }} ({{ lpgNodeRecords.length }})</div>
                 <table v-if="lpgNodeRecords.length > 0" class="storage-table">
                   <thead>
@@ -1123,7 +1016,6 @@ const App = {
                 </table>
                 <div v-else class="empty-placeholder">0 nodes</div>
 
-                <!-- Relationship Store Table -->
                 <div class="store-sub-header" style="margin-top: 8px;">{{ t.edgeStoreTitle }} ({{ lpgRecords.length }})</div>
                 <table v-if="lpgRecords.length > 0" class="storage-table">
                   <thead>
@@ -1165,7 +1057,6 @@ const App = {
             <div id="query-content" class="card-scroll-body">
               <pre class="code-block query-code-block" :style="{ color: state.ontology === 'BFO' ? '#0369a1' : '#3730a3' }">{{ queryCode }}</pre>
 
-              <!-- Live Query Execution Result Box -->
               <div class="query-result-box">
                 <div class="query-result-header">
                   <span>{{ t.queryResultTitle }}</span>
@@ -1176,7 +1067,16 @@ const App = {
                     {{ t.queryDefectsFound }} {{ liveQueryResult.defectiveCount }}
                   </span>
                 </div>
-                <table v-if="liveQueryResult.rows.length > 0" class="storage-table">
+
+                <!-- QDIKW Alerts (Wisdom & Blind Spots) -->
+                <div id="qdikw-wisdom-box" v-for="alert in semanticGraph.wisdomAlerts" :key="alert" class="wisdom-directive-card">
+                  🔴 <strong>WISDOM REACHED:</strong> {{ alert }}
+                </div>
+                <div id="qdikw-blindspot-box" v-for="bs in semanticGraph.blindSpots" :key="bs" class="blindspot-warning-card">
+                  ⚠️ <strong>BOUNDARY WARNING:</strong> {{ bs }}
+                </div>
+
+                <table v-if="liveQueryResult.rows.length > 0" class="storage-table" style="margin-top: 8px;">
                   <thead>
                     <tr>
                       <th>part</th>
@@ -1213,7 +1113,7 @@ const App = {
         @ended="onAudioEnded"
       ></audio>
 
-      <!-- Subtitles Overlay (Scenario Mode) -->
+      <!-- Subtitles Overlay -->
       <div
         v-if="state.currentView === 'SCENARIO' && showSubtitles && currentSubtitleText"
         class="scenario-subtitles"
@@ -1221,7 +1121,7 @@ const App = {
         {{ currentSubtitleText }}
       </div>
 
-      <!-- Floating Scenario Player Panel -->
+      <!-- Floating Player Panel -->
       <div
         v-if="state.currentView === 'SCENARIO'"
         class="scenario-player-panel"
@@ -1230,7 +1130,6 @@ const App = {
           class="player-btn"
           @click="togglePlayAudio"
           :title="isPlaying ? 'Pause' : 'Play'"
-          :aria-label="isPlaying ? 'Pause' : 'Play'"
         >
           <span v-if="isPlaying">⏸</span>
           <span v-else>▶</span>
@@ -1240,7 +1139,6 @@ const App = {
           class="player-btn"
           @click="stopAudio(true)"
           title="Stop"
-          aria-label="Stop"
         >
           <span>⏹</span>
         </button>
@@ -1253,7 +1151,6 @@ const App = {
           step="0.1"
           :value="audioCurrentTime"
           @input="onSeek"
-          aria-label="Audio Timeline"
         />
 
         <span class="player-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
@@ -1261,9 +1158,7 @@ const App = {
         <button
           class="player-btn player-btn-cc"
           :class="{ active: showSubtitles }"
-          :title="showSubtitles ? 'Hide Subtitles' : 'Show Subtitles'"
           @click="showSubtitles = !showSubtitles"
-          aria-label="Toggle Subtitles"
         >
           CC
         </button>
@@ -1275,7 +1170,6 @@ const App = {
         class="floating-home-btn"
         @click="goHome"
         title="Return to Main Menu"
-        aria-label="Return to Main Menu"
       >
         <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>

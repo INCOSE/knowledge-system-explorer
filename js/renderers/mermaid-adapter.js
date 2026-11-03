@@ -2,8 +2,7 @@
  * MERMAID RENDERER ADAPTER
  * ------------------------
  * Translates the abstract Semantic Graph into Mermaid flowchart syntax
- * and renders it to the DOM without leaking internal metadata properties.
- * Now includes Pan & Zoom support and ELK layout engine for better readability.
+ * and renders it to the DOM with ELK layout and svg-pan-zoom support.
  */
 
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
@@ -11,22 +10,15 @@ import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
 let isRendering = false;
 let pendingDefinition = null;
 let renderCounter = 0;
-let panZoomInstance = null; // Store the pan-zoom instance
+let panZoomInstance = null;
 
-/**
- * Updates the Mermaid graph in the specified container.
- *
- * @param {Object} semanticGraph - { nodes: [], edges: [] }
- * @param {HTMLElement} container - The DOM element to host the SVG.
- */
 export async function updateMermaidNetwork(semanticGraph, container) {
   if (!container) return;
 
   if (!semanticGraph || !Array.isArray(semanticGraph.nodes) || semanticGraph.nodes.length === 0) {
-    // Destroy pan-zoom if the graph is empty
     if (panZoomInstance) {
-        panZoomInstance.destroy();
-        panZoomInstance = null;
+      panZoomInstance.destroy();
+      panZoomInstance = null;
     }
     container.innerHTML = `<div style="margin: auto; color: #94a3b8; font-size: 13px; font-weight: 500;">Empty Graph Canvas (T = 0)</div>`;
     return;
@@ -46,36 +38,29 @@ async function executeRender(definition, container) {
   isRendering = true;
   try {
     const renderId = 'mermaid_svg_' + (++renderCounter);
-    
-    // 1. Render the SVG using Mermaid
     const { svg } = await mermaid.render(renderId, definition);
     container.innerHTML = svg;
-    
-    // 2. Destroy the previous pan-zoom instance to prevent memory leaks
+
     if (panZoomInstance) {
-        panZoomInstance.destroy();
-        panZoomInstance = null;
+      panZoomInstance.destroy();
+      panZoomInstance = null;
     }
 
-    // 3. Initialize svg-pan-zoom on the newly created SVG element
     const svgElement = container.querySelector('svg');
     if (svgElement && window.svgPanZoom) {
-        // Ensure the SVG takes up the full container for panning/zooming to work properly
-        svgElement.style.width = '100%';
-        svgElement.style.height = '100%';
-        // Remove max-width constraint set by mermaid
-        svgElement.style.maxWidth = 'none';
+      svgElement.style.width = '100%';
+      svgElement.style.height = '100%';
+      svgElement.style.maxWidth = 'none';
 
-        panZoomInstance = svgPanZoom(svgElement, {
-            zoomEnabled: true,
-            controlIconsEnabled: true, // Show +/-/reset buttons
-            fit: true,
-            center: true,
-            minZoom: 0.1,
-            maxZoom: 10
-        });
+      panZoomInstance = svgPanZoom(svgElement, {
+        zoomEnabled: true,
+        controlIconsEnabled: true,
+        fit: true,
+        center: true,
+        minZoom: 0.1,
+        maxZoom: 10
+      });
     }
-
   } catch (err) {
     console.error('[Mermaid Adapter] Render Error:', err);
   } finally {
@@ -88,18 +73,12 @@ async function executeRender(definition, container) {
   }
 }
 
-/**
- * Builds the string definition for the Mermaid flowchart.
- *
- * @param {Object} semanticGraph - Standardised Semantic Graph.
- * @returns {string} Mermaid chart definition string.
- */
 function buildMermaidDefinition(semanticGraph) {
-  // Use ELK layout for better graph density and set flow to Top-Down (TD)
   let def = `%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%\nflowchart TD\n`;
   def += '  classDef default fill:#f8fafc,stroke:#cbd5e1,color:#334155,stroke-width:1px\n';
   def += '  classDef bfoSys fill:#0284c7,stroke:#0369a1,color:#ffffff,stroke-width:2px\n';
-  def += '  classDef bfoElem fill:#64748b,stroke:#475569,color:#ffffff,stroke-width:1px\n';
+  def += '  classDef bfoElem fill:#475569,stroke:#334155,color:#ffffff,stroke-width:1px\n';
+  def += '  classDef bfoSlot fill:#e0e7ff,stroke:#4f46e5,color:#1e1b4b,stroke-width:2px,stroke-dasharray:4 3\n';
   def += '  classDef bfoQuality fill:#f59e0b,stroke:#d97706,color:#000000,stroke-width:2px\n';
   def += '  classDef rdfStmt fill:#f59e0b,stroke:#d97706,color:#000000,stroke-width:1px\n';
   def += '  classDef rdfLit fill:#f1f5f9,stroke:#cbd5e1,color:#334155,stroke-dasharray:3 3\n';
@@ -134,7 +113,14 @@ function buildMermaidDefinition(semanticGraph) {
     let shapeOpen = '["';
     let shapeClose = '"]';
 
-    const entityType = node.type || node.properties?.entityClass;
+    const isSlotNode = node.id.startsWith('Slot_') || node.properties?.entityClass === 'Slot' || node.type === 'Slot';
+    let entityType = node.type || node.properties?.entityClass;
+
+    // Distinguish BFO Site (Slot) from physical MaterialEntity
+    if (entityType === 'MaterialEntity' && isSlotNode) {
+      entityType = 'BFO:Site (Slot)';
+    }
+
     if (entityType === 'TemporalPartMembership' || entityType === 'RelationalQuality' || entityType === 'Defect' || /^def/i.test(node.id)) {
       shapeOpen = '{{"';
       shapeClose = '"}}';
@@ -201,7 +187,7 @@ function getMermaidEdgeStyle(edge) {
   const label = (edge.label || '').toLowerCase();
 
   if (rel === 'has_defect' || label === 'has_defect' || label === 'defect') {
-    return { stroke: '#ef4444', width: 2 };
+    return { stroke: '#ef4444', width: 2.5 };
   }
   if (rel === 'inherence' || label === 'inheres_in') {
     return { stroke: '#f59e0b', width: 2 };
@@ -227,6 +213,7 @@ function getMermaidEdgeStyle(edge) {
 
 function getNodeClass(node) {
   const entityType = node.type || node.properties?.entityClass || node.properties?.entityType;
+  const isSlotNode = node.id.startsWith('Slot_') || node.properties?.entityClass === 'Slot' || node.type === 'Slot';
 
   switch (entityType) {
     case 'Vehicle':
@@ -240,6 +227,7 @@ function getNodeClass(node) {
     case 'Warehouse':
       return 'naiveWarehouse';
     case 'MaterialEntity':
+      if (isSlotNode) return 'bfoSlot';
       return (node.properties?.entityType === 'system' || node.properties?.entityClass === 'Vehicle')
         ? 'bfoSys'
         : 'bfoElem';

@@ -935,3 +935,207 @@ pre.query-code-block {
   height: auto;
   min-width: 100%; /* Граф не будет меньше ширины экрана, но сможет стать больше */
 }
+
+/* --- Fullscreen Narrative Figure Overlay (./figures/) --- */
+.figure-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 850;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32px 24px 110px 24px;
+  animation: fadeInFigure 0.35s ease;
+}
+
+@keyframes fadeInFigure {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.figure-modal-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 960px;
+  width: 92%;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 2px solid #4f46e5;
+  position: relative;
+}
+
+.figure-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+}
+
+.figure-modal-img {
+  max-width: 100%;
+  max-height: 56vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.figure-modal-caption {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
+}
+
+.figure-modal-attribution {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+}
+
+.figure-modal-attribution a {
+  color: #0284c7;
+  text-decoration: underline;
+}
+
+/* --- QDIKW Stage Progress & Role Banner --- */
+.qdikw-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+  color: #f8fafc;
+  padding: 6px 14px;
+  border-bottom: 2px solid #4f46e5;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.qdikw-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qdikw-step-pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #334155;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.qdikw-step-pill.active {
+  background: #4f46e5;
+  color: #ffffff;
+  border-color: #818cf8;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+  transform: scale(1.05);
+}
+
+.qdikw-role-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.qdikw-role-name {
+  background: #f59e0b;
+  color: #0f172a;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.qdikw-role-desc {
+  color: #cbd5e1;
+}
+
+/* --- SMRM Semantic Rules & Slot Context Toolbar --- */
+.smrm-rules-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f5f3ff;
+  border-top: 1px solid #ddd6fe;
+  padding: 5px 12px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.rule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #c4b5fd;
+  color: #4c1d95;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rule-chip.active {
+  background: #6d28d9;
+  color: #ffffff;
+  border-color: #5b21b6;
+}
+
+/* --- Amber Highlight for Active Operations --- */
+@keyframes amberPulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.85); }
+  70% { box-shadow: 0 0 0 9px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.tour-amber-highlight {
+  outline: 2.5px solid #f59e0b !important;
+  outline-offset: 2px;
+  animation: amberPulse 1.6s infinite;
+  position: relative;
+  z-index: 35;
+}
+
+/* --- Wisdom & Blind Spot Cards --- */
+.wisdom-directive-card {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef2f2;
+  border-left: 4px solid #dc2626;
+  color: #7f1d1d;
+  font-size: 11px;
+}
+
+.blindspot-warning-card {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  color: #78350f;
+  font-size: 11px;
+}
