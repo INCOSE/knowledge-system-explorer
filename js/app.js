@@ -407,7 +407,8 @@ const App = {
       } else {
         url.searchParams.delete('demo');
       }
-      window.history.replaceState({}, '', url.toString());
+      // ИЗМЕНЕНИЕ: используем pushState вместо replaceState
+      window.history.pushState({}, '', url.toString());
     }
 
     function copyDemoLink(demoKey) {
@@ -434,14 +435,15 @@ const App = {
       }, 2000);
     }
 
-    function openSandbox() {
-      updateUrlQueryParam('SANDBOX');
+    function openSandbox(push = true) {
+      // Учитываем, что при клике из Vue аргумент push может быть объектом PointerEvent
+      if (push !== false) updateUrlQueryParam('SANDBOX');
       state.currentView = 'SANDBOX';
     }
 
-    function launchScenario(scenarioId) {
+    function launchScenario(scenarioId, push = true) {
       activeScenarioId.value = scenarioId;
-      updateUrlQueryParam(scenarioId);
+      if (push !== false) updateUrlQueryParam(scenarioId);
       stopAudio(false);
       if (state.currentView === 'SCENARIO') {
         resetActiveScenarioState();
@@ -449,6 +451,17 @@ const App = {
       } else {
         state.currentView = 'SCENARIO';
       }
+    }
+
+    function goHome(push = true) {
+      stopAudio(false);
+      if (push !== false) updateUrlQueryParam(null);
+      state.currentView = 'MENU';
+      state.qdikw.active = false;
+      state.figureOverlay.visible = false;
+      state.eventLog.splice(0, state.eventLog.length);
+      state.currentTime = 0;
+      state.edgeSequence = 1;
     }
 
     function jumpToTime(targetTime) {
@@ -493,7 +506,9 @@ const App = {
     onMounted(() => {
       seedInitialSandboxData();
 
-      if (typeof window !== 'undefined') {
+      // ИЗМЕНЕНИЕ: Оборачиваем логику маршрутизации
+      function handleRouting(isInitialLoad = false) {
+        if (typeof window === 'undefined') return;
         const params = new URLSearchParams(window.location.search);
         const rawDemo = (params.get('demo') || window.location.hash.replace('#', '')).trim().toUpperCase();
 
@@ -511,12 +526,21 @@ const App = {
         };
 
         const resolved = demoAliases[rawDemo];
-        if (resolved === 'SANDBOX') {
-          state.currentView = 'SANDBOX';
-        } else if (resolved) {
-          launchScenario(resolved);
+        
+        if (!resolved) {
+          if (!isInitialLoad) goHome(false); // Если вернулись назад на главную страницу (demo=null)
+        } else if (resolved === 'SANDBOX') {
+          openSandbox(false);
+        } else {
+          launchScenario(resolved, false);
         }
       }
+
+      // Вызываем при первой загрузке
+      handleRouting(true);
+
+      // ИЗМЕНЕНИЕ: Слушаем кнопки браузера "Назад" и "Вперед"
+      window.addEventListener('popstate', () => handleRouting(false));
 
       if (state.currentView !== 'MENU' && visContainer.value) {
         initVisNetwork(visContainer.value);
