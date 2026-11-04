@@ -7,8 +7,10 @@
 
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
 
+const INFERRED_NODE_TYPES = ['InferredStress', 'InferredHazard', 'WisdomDirective', 'BlindSpot'];
+
 /**
- * Generates a W3C RDF Turtle (.ttl) serialisation string from a Semantic Graph.
+ * Generates a W3C RDF Turtle (.ttl) serialisation string from a Logical Semantic Graph.
  *
  * @param {Object} semanticGraph - Standardised Semantic Graph with nodes and edges.
  * @returns {string} Pure Turtle (.ttl) serialisation text.
@@ -18,8 +20,12 @@ export function generateRdfStorage(semanticGraph) {
     return '# Empty RDF Graph (0 triples)';
   }
 
-  const is4D = semanticGraph.nodes.some(n => n.type === 'State' || n.type === 'ActualIndividual');
-  const isBFO = semanticGraph.nodes.some(n => n.type === 'MaterialEntity' || n.type === 'Quality');
+  // Filter out runtime inference overlays so the DB dump reflects stored triples
+  const baseNodes = semanticGraph.nodes.filter(n => !INFERRED_NODE_TYPES.includes(n.type));
+  const baseEdges = (semanticGraph.edges || []).filter(e => e.type !== 'inference');
+
+  const is4D = baseNodes.some(n => n.type === 'State' || n.type === 'ActualIndividual');
+  const isBFO = baseNodes.some(n => n.type === 'MaterialEntity' || n.type === 'Quality');
   let ttl = '';
 
   // 1. 4D ISO 15926 Turtle Serialisation
@@ -28,22 +34,31 @@ export function generateRdfStorage(semanticGraph) {
     ttl += `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n`;
     ttl += `# 4D Perdurant Graph persisted as Pure Binary RDF Triples\n`;
 
-    const individuals = semanticGraph.nodes.filter(n => n.type === 'ActualIndividual');
+    const individuals = baseNodes.filter(n => n.type === 'ActualIndividual');
     individuals.forEach(ind => {
       const cls = ind.properties?.entityClass || 'Part';
       ttl += `:${ind.id} a iso:ActualIndividual , iso:${cls} .\n`;
     });
 
-    const defectNodes = semanticGraph.nodes.filter(n => n.type === 'Defect');
+    const defectNodes = baseNodes.filter(n => n.type === 'Defect');
     defectNodes.forEach(d => {
       const dType = d.properties?.defectType || 'defect';
       const dVal = d.properties?.value || 'present';
-      ttl += `:${d.id} a iso:DefectClass ;\n    iso:defectType "${dType}" ;\n    iso:severity "${dVal}" .\n`;
+      const vFrom = d.properties?.validFrom;
+      const vTo = d.properties?.validTo;
+      ttl += `\n:${d.id} a iso:DefectClass ;\n    iso:defectType "${dType}" ;\n    iso:severity "${dVal}"`;
+      if (vFrom !== undefined && vFrom !== null) {
+        ttl += ` ;\n    iso:validFrom "${vFrom}"^^xsd:integer`;
+      }
+      if (vTo !== undefined && vTo !== null) {
+        ttl += ` ;\n    iso:validTo   "${vTo}"^^xsd:integer`;
+      }
+      ttl += ` .\n`;
     });
 
-    const states = semanticGraph.nodes.filter(n => n.type === 'State');
+    const states = baseNodes.filter(n => n.type === 'State');
     states.forEach(st => {
-      const outgoing = (semanticGraph.edges || []).filter(e => e.from === st.id);
+      const outgoing = baseEdges.filter(e => e.from === st.id);
       const vFrom = st.properties?.validFrom;
       const vTo = st.properties?.validTo;
 
@@ -76,21 +91,24 @@ export function generateRdfStorage(semanticGraph) {
     return ttl;
   }
 
-  // 2. 3D BFO Turtle Serialisation (with W3C Reification)
+  // 2. 3D BFO Turtle Serialisation (with standard W3C rdf:Statement Reification)
   if (isBFO) {
     ttl += `@prefix : <http://example.org/bfo/> .\n`;
+    ttl += `@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n`;
     ttl += `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n`;
     ttl += `# 3D Continuant Graph persisted via W3C Reification & Quality Inherence\n`;
 
-    semanticGraph.nodes.filter(n => n.type === 'MaterialEntity').forEach(n => {
-      const cls = n.properties?.entityClass || 'Part';
-      ttl += `:${n.id} a :MaterialEntity , :${cls} .\n`;
+    baseNodes.filter(n => n.type === 'MaterialEntity').forEach(n => {
+      const isSlot = n.id.startsWith('Slot_') || n.properties?.entityClass === 'Slot';
+      const cls = isSlot ? 'Slot' : (n.properties?.entityClass || 'Part');
+      const bfoType = isSlot ? 'Site' : 'MaterialEntity';
+      ttl += `:${n.id} a :${bfoType} , :${cls} .\n`;
     });
 
-    semanticGraph.nodes.filter(n => n.type === 'Quality').forEach(q => {
-      const inh = (semanticGraph.edges || []).find(e => e.from === q.id && e.label === 'inheres_in');
-      const vFrom = q.properties?.validFrom;
-      const vTo = q.properties?.validTo;
+    baseNodes.filter(n => n.type === 'Quality').forEach(q => {
+      const inh = baseEdges.find(e => e.from === q.id && e.label === 'inheres_in');
+      const vFrom = q.properties?.validFrom ?? inh?.properties?.validFrom;
+      const vTo = q.properties?.validTo ?? inh?.properties?.validTo;
       ttl += `\n:${q.id} a :Quality`;
       if (q.properties?.qualityType) {
         ttl += ` ;\n    :qualityType "${q.properties.qualityType}"`;
@@ -110,18 +128,16 @@ export function generateRdfStorage(semanticGraph) {
       ttl += ` .\n`;
     });
 
-    (semanticGraph.edges || []).filter(e => e.type !== 'inherence').forEach(edge => {
+    baseEdges.filter(e => e.type !== 'inherence' && e.label !== 'inheres_in').forEach((edge, idx) => {
       const vFrom = edge.properties?.validFrom;
       const vTo = edge.properties?.validTo;
       const rel = edge.label || edge.type;
-      const isChildToParent = rel === 'mounted_in' || rel === 'stored_at';
-      const parentId = isChildToParent ? edge.to : edge.from;
-      const childId = isChildToParent ? edge.from : edge.to;
+      const stmtId = `stmt_${edge.id || idx}_${edge.from}_${vFrom ?? 0}`;
 
-      ttl += `\n_:${edge.id} a :RelationalQuality ;\n`;
-      ttl += `    :relationType :${rel} ;\n`;
-      ttl += `    :hasParent :${parentId} ;\n`;
-      ttl += `    :hasChild  :${childId}`;
+      ttl += `\n_:${stmtId} a rdf:Statement ;\n`;
+      ttl += `    rdf:subject   :${edge.from} ;\n`;
+      ttl += `    rdf:predicate :${rel} ;\n`;
+      ttl += `    rdf:object    :${edge.to}`;
 
       if (vFrom !== undefined && vFrom !== null) {
         ttl += ` ;\n    :validFrom "${vFrom}"^^xsd:integer`;
@@ -141,7 +157,7 @@ export function generateRdfStorage(semanticGraph) {
   ttl += `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\n`;
   ttl += `# Naive Domain Graph persisted as RDF Triples & Reified Statements\n`;
 
-  semanticGraph.nodes.forEach(n => {
+  baseNodes.forEach(n => {
     ttl += `:${n.id} a :${n.type || 'Part'}`;
     if (n.properties) {
       Object.entries(n.properties).forEach(([k, v]) => {
@@ -153,17 +169,15 @@ export function generateRdfStorage(semanticGraph) {
     ttl += ` .\n`;
   });
 
-  (semanticGraph.edges || []).forEach(edge => {
+  baseEdges.forEach(edge => {
     const edgeRel = edge.label || 'has_part';
     const vFrom = edge.properties?.validFrom;
     const vTo = edge.properties?.validTo;
 
-    // Emit direct triple if currently active
     if (edge.properties?.isCurrent !== false) {
       ttl += `\n:${edge.from} :${edgeRel} :${edge.to} .\n`;
     }
 
-    // Emit W3C Statement reification to hold validFrom/validTo and edge-attached defects
     ttl += `_:${edge.id} a rdf:Statement ;\n`;
     ttl += `    rdf:subject   :${edge.from} ;\n`;
     ttl += `    rdf:predicate :${edgeRel} ;\n`;
@@ -225,13 +239,16 @@ WHERE {
   if (isBFO) {
     return `# SPARQL (W3C RDF) — BFO (3D) Reified Placement & Quality at T = ${t}
 PREFIX : <http://example.org/bfo/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 SELECT ?part ?location ?qualityType ?value
 WHERE {
-  ?stmt a :RelationalQuality ;
-        :hasChild ?part ;
-        :hasParent ?location ;
+  ?stmt a rdf:Statement ;
+        rdf:subject ?part ;
+        rdf:predicate ?pred ;
+        rdf:object ?location ;
         :validFrom ?vf .
   OPTIONAL { ?stmt :validTo ?vt }
+  FILTER (?pred IN (:mounted_in, :stored_at))
   FILTER (?vf <= ${t} && (!BOUND(?vt) || ?vt > ${t}))
 
   OPTIONAL {

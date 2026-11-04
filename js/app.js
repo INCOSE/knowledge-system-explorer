@@ -1,9 +1,9 @@
 /**
  * APPLICATION ORCHESTRATOR (Vue 3)
  * --------------------------------
- * Binds the single reactive state to the DOM, handles user inputs, and routes
- * data between the Event Log, Domain Actions, Ontologies (SMIM), Storage (SMS),
- * Viewpoints (URMSM), and Renderers.
+ * Binds the single reactive state to the DOM, handles user inputs, URL deep-linking,
+ * chapter navigation, and routes data between the Event Log, Domain Actions,
+ * Ontologies (SMIM), Storage (SMS), Viewpoints (URMSM), and Renderers.
  */
 
 import { createApp, computed, watch, onMounted, ref, reactive, nextTick } from 'vue';
@@ -49,6 +49,11 @@ import {
   onQdikwTimeUpdate,
   resetQdikwTimeline
 } from './scenarios/scenario-qdikw.js';
+import {
+  fourQuadrantsScenario,
+  onFourQuadrantsTimeUpdate,
+  resetFourQuadrantsTimeline
+} from './scenarios/scenario-four-quadrants.js';
 
 const BomNode = {
   name: 'BomNode',
@@ -90,8 +95,9 @@ const App = {
     const bizStorePart = ref('');
     const bizStoreTarget = ref('');
 
-    // Scenario Player State
-    const activeScenarioId = ref('QDIKW_PIPELINE');
+    // Scenario Player & Deep-Link State
+    const activeScenarioId = ref('FOUR_QUADRANTS');
+    const copiedLinkKey = ref('');
     const scenarioAudio = ref(null);
     const isPlaying = ref(false);
     const audioCurrentTime = ref(0);
@@ -104,10 +110,25 @@ const App = {
     const activeScenarioObj = computed(() => {
       if (activeScenarioId.value === 'SANDBOX_TOUR') return sandboxTourScenario;
       if (activeScenarioId.value === 'QDIKW_PIPELINE') return qdikwScenario;
+      if (activeScenarioId.value === 'FOUR_QUADRANTS') return fourQuadrantsScenario;
       return vanishingCrackScenario;
     });
 
     const activeAudioSrc = computed(() => activeScenarioObj.value.audioSrc);
+    const activeChapters = computed(() => activeScenarioObj.value.chapters || []);
+
+    const currentChapterId = computed(() => {
+      const chs = activeChapters.value;
+      if (!chs.length) return '';
+      let activeId = chs[0].id;
+      for (let i = 0; i < chs.length; i++) {
+        if (audioCurrentTime.value >= chs[i].time) {
+          activeId = chs[i].id;
+        }
+      }
+      return activeId;
+    });
+
     const layout = reactive({ leftWidth: 64, bomHeight: 24, storageHeight: 42 });
     const t = computed(() => i18n[state.language] || i18n.en);
 
@@ -137,7 +158,7 @@ const App = {
     const activeWarehouses = computed(() => baseNodes.value.filter(n => n.entityClass === 'Warehouse').map(n => n.id));
     const bizInstallSources = computed(() => baseNodes.value.filter(n => n.entityClass === 'Part' || n.entityClass === 'Vehicle').map(n => n.id));
     const bizInstallTargets = computed(() => baseNodes.value.filter(n => n.entityClass === 'Vehicle' || n.entityClass === 'Part' || n.entityClass === 'Slot' || n.entityClass === 'Warehouse').map(n => n.id));
-    
+
     function dispatch(event) {
       if (!event) return;
       state.eventLog.push(event);
@@ -248,7 +269,7 @@ const App = {
 
     const graphLegendItems = computed(() => {
       const nodes = []; const edges = []; const dict = t.value.legend;
-      
+
       if (state.perspective === 'SMRM' || state.ontology === 'NAIVE_NODE' || state.ontology === 'NAIVE_EDGE') {
         nodes.push({ id: 'naiveVehicle', label: dict.naiveVehicle, swatch: 'swatch-box-vehicle' });
         if (state.perspective !== 'SMRM') nodes.push({ id: 'naiveSlot', label: dict.naiveSlot, swatch: 'swatch-box-slot' });
@@ -256,7 +277,7 @@ const App = {
         nodes.push({ id: 'naiveDefect', label: dict.naiveDefect, swatch: 'swatch-diamond-defect' });
         nodes.push({ id: 'naiveWarehouse', label: dict.naiveWarehouse, swatch: 'swatch-box-warehouse' });
         if (state.perspective === 'SMS_RDF') {
-          nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-diamond' });
+          nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-hex-statement' });
           nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
           edges.push({ id: 'rdfPred', label: dict.rdfPred, swatch: 'swatch-line-past' });
         } else {
@@ -364,6 +385,12 @@ const App = {
         state.graphEngine = 'MERMAID';
         audioDuration.value = qdikwScenario.fallbackDuration;
         onQdikwTimeUpdate(0, state, renderGraph, null);
+      } else if (activeScenarioId.value === 'FOUR_QUADRANTS') {
+        resetFourQuadrantsTimeline();
+        setPerspective('SMRM');
+        state.graphEngine = 'MERMAID';
+        audioDuration.value = fourQuadrantsScenario.fallbackDuration;
+        onFourQuadrantsTimeUpdate(0, state, renderGraph, null);
       } else {
         resetVanishingCrackTimeline(0);
         setPerspective('SMIM');
@@ -372,8 +399,49 @@ const App = {
       }
     }
 
+    function updateUrlQueryParam(demoValue) {
+      if (typeof window === 'undefined' || !window.history) return;
+      const url = new URL(window.location.href);
+      if (demoValue) {
+        url.searchParams.set('demo', demoValue);
+      } else {
+        url.searchParams.delete('demo');
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+
+    function copyDemoLink(demoKey) {
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+      url.searchParams.set('demo', demoKey);
+      url.hash = '';
+      const shareUrl = url.toString();
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).catch(() => {});
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = shareUrl;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+
+      copiedLinkKey.value = demoKey;
+      setTimeout(() => {
+        if (copiedLinkKey.value === demoKey) copiedLinkKey.value = '';
+      }, 2000);
+    }
+
+    function openSandbox() {
+      updateUrlQueryParam('SANDBOX');
+      state.currentView = 'SANDBOX';
+    }
+
     function launchScenario(scenarioId) {
       activeScenarioId.value = scenarioId;
+      updateUrlQueryParam(scenarioId);
       stopAudio(false);
       if (state.currentView === 'SCENARIO') {
         resetActiveScenarioState();
@@ -383,15 +451,19 @@ const App = {
       }
     }
 
-    function jumpToQdikwStage(stageKey) {
-      const targetTime = QDIKW_STAGE_TIMESTAMPS[stageKey];
-      if (targetTime === undefined) return;
+    function jumpToTime(targetTime) {
+      if (targetTime === undefined || isNaN(targetTime)) return;
       if (scenarioAudio.value && !usingVirtualTimer.value) {
         scenarioAudio.value.currentTime = targetTime;
       }
       audioCurrentTime.value = targetTime;
       resetActiveScenarioState();
       processTimelineAt(targetTime);
+    }
+
+    function jumpToQdikwStage(stageKey) {
+      const targetTime = QDIKW_STAGE_TIMESTAMPS[stageKey];
+      if (targetTime !== undefined) jumpToTime(targetTime);
     }
 
     function toggleSlotRegime() {
@@ -420,6 +492,32 @@ const App = {
 
     onMounted(() => {
       seedInitialSandboxData();
+
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const rawDemo = (params.get('demo') || window.location.hash.replace('#', '')).trim().toUpperCase();
+
+        const demoAliases = {
+          SANDBOX: 'SANDBOX',
+          SANDBOX_TOUR: 'SANDBOX_TOUR',
+          TOUR: 'SANDBOX_TOUR',
+          QDIKW_PIPELINE: 'QDIKW_PIPELINE',
+          QDIKW: 'QDIKW_PIPELINE',
+          FOUR_QUADRANTS: 'FOUR_QUADRANTS',
+          MATRIX: 'FOUR_QUADRANTS',
+          QUADRANTS: 'FOUR_QUADRANTS',
+          VANISHING_CRACK: 'VANISHING_CRACK',
+          CRACK: 'VANISHING_CRACK'
+        };
+
+        const resolved = demoAliases[rawDemo];
+        if (resolved === 'SANDBOX') {
+          state.currentView = 'SANDBOX';
+        } else if (resolved) {
+          launchScenario(resolved);
+        }
+      }
+
       if (state.currentView !== 'MENU' && visContainer.value) {
         initVisNetwork(visContainer.value);
         renderGraph();
@@ -449,6 +547,7 @@ const App = {
 
     function goHome() {
       stopAudio(false);
+      updateUrlQueryParam(null);
       state.currentView = 'MENU';
       state.qdikw.active = false;
       state.figureOverlay.visible = false;
@@ -489,6 +588,7 @@ const App = {
 
       if (activeScenarioId.value === 'SANDBOX_TOUR') resetSandboxTourTimeline(0);
       else if (activeScenarioId.value === 'QDIKW_PIPELINE') resetQdikwTimeline(0);
+      else if (activeScenarioId.value === 'FOUR_QUADRANTS') resetFourQuadrantsTimeline();
       else resetVanishingCrackTimeline(0);
 
       if (resetScenarioGraph) {
@@ -503,13 +603,17 @@ const App = {
       currentSubtitleText.value = activeSubtitle ? activeSubtitle.text : '';
 
       const uiRefs = {
-        bizRegType, bizRegId, bizInstSource, bizInstTarget, bizDefTarget, bizDefType, bizDefVal
+        bizRegType, bizRegId, bizInstSource, bizInstTarget,
+        bizDefTarget, bizDefType, bizDefVal,
+        bizDismPart, bizStorePart, bizStoreTarget
       };
 
       if (activeScenarioId.value === 'SANDBOX_TOUR') {
         onSandboxTourTimeUpdate(currentTime, state, renderGraph);
       } else if (activeScenarioId.value === 'QDIKW_PIPELINE') {
         onQdikwTimeUpdate(currentTime, state, renderGraph, uiRefs);
+      } else if (activeScenarioId.value === 'FOUR_QUADRANTS') {
+        onFourQuadrantsTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else {
         dispatchVanishingCrackTimeline(currentTime, state, renderGraph);
       }
@@ -536,10 +640,7 @@ const App = {
 
     function onSeek(event) {
       const targetTime = parseFloat(event.target.value);
-      if (scenarioAudio.value && !usingVirtualTimer.value) scenarioAudio.value.currentTime = targetTime;
-      audioCurrentTime.value = targetTime;
-      resetActiveScenarioState();
-      processTimelineAt(targetTime);
+      jumpToTime(targetTime);
     }
 
     function formatTime(seconds) {
@@ -690,7 +791,9 @@ const App = {
       state, t, layout, advanceTime, setPerspective, dispatch, semanticGraph,
       fileInput, saveJson, triggerLoadJson, onFileLoaded, renderGraph,
       entityClasses: ENTITY_CLASSES, relationTypes: RELATION_TYPES, availableNodes, goHome,
-      launchScenario, jumpToQdikwStage, toggleSlotRegime, activeScenarioId, activeAudioSrc,
+      openSandbox, launchScenario, copyDemoLink, copiedLinkKey,
+      jumpToTime, jumpToQdikwStage, toggleSlotRegime,
+      activeScenarioId, activeScenarioObj, activeAudioSrc, activeChapters, currentChapterId,
       activeParts, activeWarehouses, bizRegType, bizRegId, handleBizRegister,
       bizInstSource, bizInstTarget, handleBizInstall, bizInstallSources, bizInstallTargets,
       bizDefTarget, bizDefType, bizDefVal, handleBizReportDefect,
@@ -715,25 +818,62 @@ const App = {
         <p class="menu-subtitle">{{ t.menuSubtitle }}</p>
 
         <div class="menu-actions">
-          <button class="menu-btn menu-btn-primary" @click="state.currentView = 'SANDBOX'">
-            <span class="btn-main-text">{{ t.menuSandboxTitle }}</span>
-            <span class="btn-sub-text">{{ t.menuSandboxSub }}</span>
-          </button>
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-primary" @click="openSandbox">
+              <span class="btn-main-text">{{ t.menuSandboxTitle }}</span>
+              <span class="btn-sub-text">{{ t.menuSandboxSub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'SANDBOX' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('SANDBOX')">
+              <span v-if="copiedLinkKey === 'SANDBOX'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
 
-          <button class="menu-btn menu-btn-scenario" @click="launchScenario('SANDBOX_TOUR')">
-            <span class="btn-main-text">{{ t.menuTourTitle }}</span>
-            <span class="btn-sub-text">{{ t.menuTourSub }}</span>
-          </button>
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('SANDBOX_TOUR')">
+              <span class="btn-main-text">{{ t.menuTourTitle }}</span>
+              <span class="btn-sub-text">{{ t.menuTourSub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'SANDBOX_TOUR' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('SANDBOX_TOUR')">
+              <span v-if="copiedLinkKey === 'SANDBOX_TOUR'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
 
-          <button class="menu-btn menu-btn-scenario" @click="launchScenario('QDIKW_PIPELINE')">
-            <span class="btn-main-text">{{ t.menuQdikwTitle }}</span>
-            <span class="btn-sub-text">{{ t.menuQdikwSub }}</span>
-          </button>
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('QDIKW_PIPELINE')">
+              <span class="btn-main-text">{{ t.menuQdikwTitle }}</span>
+              <span class="btn-sub-text">{{ t.menuQdikwSub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'QDIKW_PIPELINE' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('QDIKW_PIPELINE')">
+              <span v-if="copiedLinkKey === 'QDIKW_PIPELINE'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
 
-          <button class="menu-btn menu-btn-scenario" @click="launchScenario('VANISHING_CRACK')">
-            <span class="btn-main-text">{{ t.menuCrackTitle }}</span>
-            <span class="btn-sub-text">{{ t.menuCrackSub }}</span>
-          </button>
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('FOUR_QUADRANTS')">
+              <span class="btn-main-text">{{ t.menuMatrixTitle || '🏛️ The 2×2 Architectural Matrix (BFO / 15926 × LPG / RDF)' }}</span>
+              <span class="btn-sub-text">{{ t.menuMatrixSub || 'Deep-dive benchmark across all 4 quadrants: supplier federation, reification, 4D state explosion & query cost' }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'FOUR_QUADRANTS' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('FOUR_QUADRANTS')">
+              <span v-if="copiedLinkKey === 'FOUR_QUADRANTS'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
+
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('VANISHING_CRACK')">
+              <span class="btn-main-text">{{ t.menuCrackTitle }}</span>
+              <span class="btn-sub-text">{{ t.menuCrackSub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'VANISHING_CRACK' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('VANISHING_CRACK')">
+              <span v-if="copiedLinkKey === 'VANISHING_CRACK'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="landing-footer" style="margin-top: 28px; text-align: center; color: #64748b; font-size: 13px; line-height: 1.6;">
+          Developed by <a href="https://efremov-systems.com" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none; font-weight: 600;">Alexander Efremov</a>.<br/>
+          This tool is in active development. Feedback and suggestions are welcome via 
+          <a href="https://github.com/INCOSE/knowledge-system-explorer/issues" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none;">GitHub Issues</a>.<br/>
+          Repository: <a href="https://github.com/INCOSE/knowledge-system-explorer" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none;">INCOSE/knowledge-system-explorer</a>
         </div>
       </div>
     </div>
@@ -751,6 +891,14 @@ const App = {
     <!-- Main Sandbox & Scenario Workspace -->
     <div v-if="state.currentView !== 'MENU'" class="sandbox-workspace">
       <div class="control-deck">
+
+        <!-- Generic Scenario Chapters Bar (Used by Four Quadrants & multi-chapter narratives) -->
+        <div v-if="state.currentView === 'SCENARIO' && activeChapters.length > 0" class="scenario-chapters-bar">
+          <span class="scenario-chapters-title">📑 Chapters:</span>
+          <button v-for="ch in activeChapters" :key="ch.id" class="chapter-pill" :class="{ active: currentChapterId === ch.id }" @click="jumpToTime(ch.time)" :title="'Jump to ' + ch.label + ' (' + formatTime(ch.time) + ')'">
+            {{ ch.label }} <small style="opacity:0.75;">({{ formatTime(ch.time) }})</small>
+          </button>
+        </div>
 
         <!-- QDIKW Stage & Role Banner -->
         <div id="qdikw-stage-bar" v-if="state.qdikw?.active" class="qdikw-banner">
@@ -812,8 +960,8 @@ const App = {
           <div class="btn-group">
             <button id="ctrl-view-smrm" :class="{ active: state.perspective === 'SMRM' }" @click="setPerspective('SMRM')">{{ t.viewSmrm }}</button>
             <button id="ctrl-view-logical" :class="{ active: state.perspective === 'SMIM' }" @click="setPerspective('SMIM')">{{ t.viewLogical }}</button>
-            <button id="ctrl-view-physical-lpg" :class="{ active: state.perspective === 'SMS_LPG' }" @click="setPerspective('SMS_LPG')">{{ t.viewPhysicalLpg }}</button>
-            <button id="ctrl-view-physical-rdf" :class="{ active: state.perspective === 'SMS_RDF' }" @click="setPerspective('SMS_RDF')">{{ t.viewPhysicalRdf }}</button>
+            <button id="ctrl-view-physical-lpg" :class="{ active: state.perspective === 'SMS_LPG' }" @click="state.storage = 'LPG'; setPerspective('SMS_LPG')">{{ t.viewPhysicalLpg }}</button>
+            <button id="ctrl-view-physical-rdf" :class="{ active: state.perspective === 'SMS_RDF' }" @click="state.storage = 'RDF'; setPerspective('SMS_RDF')">{{ t.viewPhysicalRdf }}</button>
           </div>
 
           <div class="divider"></div>
@@ -1058,7 +1206,6 @@ const App = {
                   </span>
                 </div>
 
-                <!-- QDIKW Alerts (Wisdom & Blind Spots) -->
                 <div id="qdikw-wisdom-box" v-for="alert in semanticGraph.wisdomAlerts" :key="alert" class="wisdom-directive-card">
                   🔴 <strong>{{ t.wisdomHeader }}</strong> {{ alert }}
                 </div>
@@ -1097,8 +1244,8 @@ const App = {
       <div v-if="state.currentView === 'SCENARIO'" class="scenario-player-panel">
         <button class="player-btn" @click="togglePlayAudio" :title="isPlaying ? 'Pause' : 'Play'"><span v-if="isPlaying">⏸</span><span v-else>▶</span></button>
         <button class="player-btn" @click="stopAudio(true)" title="Stop"><span>⏹</span></button>
-        <input type="range" class="player-progress" min="0" :max="audioDuration || 108" step="0.1" :value="audioCurrentTime" @input="onSeek" />
-        <span class="player-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration) }}</span>
+        <input type="range" class="player-progress" min="0" :max="audioDuration || activeScenarioObj.fallbackDuration || 108" step="0.1" :value="audioCurrentTime" @input="onSeek" />
+        <span class="player-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration || activeScenarioObj.fallbackDuration) }}</span>
         <button class="player-btn player-btn-cc" :class="{ active: showSubtitles }" @click="showSubtitles = !showSubtitles">CC</button>
       </div>
       <button v-if="state.currentView !== 'MENU'" class="floating-home-btn" @click="goHome" title="Return to Main Menu">

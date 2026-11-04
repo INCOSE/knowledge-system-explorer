@@ -1221,3 +1221,93 @@ pre.query-code-block {
   transform: none;
   flex-shrink: 0;
 }
+
+/* --- Menu Action Row with Shareable Link Button --- */
+.menu-action-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.menu-action-row > .menu-btn {
+  flex: 1;
+}
+
+.menu-share-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.menu-share-btn:hover {
+  background: #e0f2fe;
+  border-color: #0284c7;
+  color: #0369a1;
+  transform: translateY(-1px);
+}
+
+.menu-share-btn.copied {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* --- Scenario Chapters Navigation Bar --- */
+.scenario-chapters-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+  border-bottom: 1px solid #334155;
+  overflow-x: auto;
+}
+
+.scenario-chapters-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.chapter-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #475569;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.chapter-pill:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.chapter-pill.active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+}

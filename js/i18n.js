@@ -83,6 +83,11 @@ export const i18n = {
     blindspotHeader: 'BOUNDARY WARNING:',
     closeBtn: 'Close',
 
+    menuMatrixTitle: '🏛️ The 2×2 Architectural Matrix (BFO / 15926 × LPG / RDF)',
+    menuMatrixSub: 'Deep-dive benchmark across all 4 quadrants: supplier federation, reification, 4D state explosion & query cost',
+    copyLinkTooltip: 'Copy direct shareable link to this demonstration',
+    linkCopiedToast: 'Link copied!',
+
     tooltips: {
       smim: '<strong>SMIM (Semantic Information Model):</strong> Formal top-level ontological commitment (3D continuants vs 4D extents).',
       sms: '<strong>SMS (Semantic Model Storage):</strong> Physical database representation (LPG tables vs W3C RDF triples).',
@@ -161,6 +166,11 @@ export const i18n = {
     queryDesc: '(Поиск дефектов на момент T = ',
     queryResultTitle: 'Результат выполнения запроса:',
     queryDefectsFound: 'Найдено дефектов:',
+
+    menuMatrixTitle: '🏛️ Архитектурная матрица 2×2 (BFO / 15926 × LPG / RDF)',
+    menuMatrixSub: 'Сравнение 4 квадрантов: федерация поставщиков, реификация RDF, взрыв 4D-состояний и стоимость запросов',
+    copyLinkTooltip: 'Скопировать прямую ссылку на эту демонстрацию',
+    linkCopiedToast: 'Ссылка скопирована!',
 
     // Главное меню и сценарии
     menuBadge: 'Стенд IEC 63339',
@@ -325,6 +335,11 @@ export const i18n = {
     wisdomHeader: 'VISDOM UPPNÅDD:',
     blindspotHeader: 'GRÄNSVARNING (BLIND FLÄCK):',
     closeBtn: 'Stäng',
+
+    menuMatrixTitle: '🏛️ Den arkitektoniska 2×2-matrisen (BFO / 15926 × LPG / RDF)',
+    menuMatrixSub: 'Djupdykning i alla 4 kvadranter: leverantörsfederation, reifiering, 4D-tillståndsexplosion & frågekostnad',
+    copyLinkTooltip: 'Kopiera direktlänk till denna demonstration',
+    linkCopiedToast: 'Länk kopierad!',
 
     tooltips: {
       smim: '<strong>SMIM:</strong> Formell ontologisk modell (3D BFO vs 4D ISO 15926).',

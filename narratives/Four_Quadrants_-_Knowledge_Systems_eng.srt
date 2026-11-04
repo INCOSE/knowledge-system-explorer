@@ -1,0 +1,1017 @@
+1
+00:00:00,220 --> 00:00:02,980
+Welcome to the Architectural Matrix
+Demonstrator.
+
+2
+00:00:05,800 --> 00:00:11,080
+In the previous scenarios, we saw why
+naive, schema-free graphs collapse when
+
+3
+00:00:11,080 --> 00:00:14,380
+confronted with time, history, and
+engineering rules.
+
+4
+00:00:15,300 --> 00:00:19,760
+Once an organization accepts that it needs
+formal semantics, the engineering
+
+5
+00:00:19,760 --> 00:00:24,100
+leadership immediately faces a two-by-two
+architectural crossroads.
+
+6
+00:00:26,720 --> 00:00:31,560
+On the horizontal axis, you must choose
+your top-level ontological commitment at
+
+7
+00:00:31,560 --> 00:00:33,220
+the SMIM layer.
+
+8
+00:00:35,300 --> 00:00:40,900
+Do you model the world in three dimensions
+using BFO, the Basic Formal Ontology,
+
+9
+00:00:41,460 --> 00:00:45,120
+where physical parts are enduring objects
+that pass through time?
+
+10
+00:00:46,060 --> 00:00:52,620
+Or do you model the world in four
+dimensions using ISO 15926, where every
+
+11
+00:00:52,620 --> 00:00:58,120
+physical object is a spatiotemporal worm
+sliced into immutable historical states?
+
+12
+00:01:00,300 --> 00:01:06,020
+On the vertical axis, you must choose your
+physical graph storage mechanism at the SMS layer.
+
+13
+00:01:07,780 --> 00:01:11,247
+Do you deploy a labeled property graph, LPG, 
+
+14
+00:01:11,247 --> 00:01:15,260
+where nodes and edges carry internal
+key-value dictionaries?
+
+15
+00:01:16,300 --> 00:01:22,380
+Or do you deploy a W3C Resource
+Description Framework store, RDF, where
+
+16
+00:01:22,380 --> 00:01:27,940
+all knowledge is decomposed into atomic
+binary triples governed by global URIs?
+
+17
+00:01:30,680 --> 00:01:36,000
+Cross these two axes, and you get four
+legitimate industrial-grade architectures.
+
+18
+00:01:36,000 --> 00:01:38,000
+None of them is wrong.
+
+19
+00:01:38,680 --> 00:01:43,280
+Yet in practice, choosing the wrong
+quadrant for your organizational reality
+
+20
+00:01:43,280 --> 00:01:45,640
+has bankrupted digital thread initiatives.
+
+21
+00:01:47,800 --> 00:01:52,780
+To see why, we will not drown you in
+hundreds of equipment classes. We will use
+
+22
+00:01:52,780 --> 00:01:59,220
+our compact domain vocabulary, vehicle,
+functional slot, part, warehouse, and
+
+23
+00:01:59,220 --> 00:02:03,960
+defect, to run a single lifecycle stress
+test across all four quadrants.
+
+24
+00:02:06,420 --> 00:02:08,500
+Let us set the stage on the canvas.
+
+25
+00:02:10,100 --> 00:02:20,780
+At time T equals 10, suspension arm ARM_SN_404 
+is registered and placed inwarehouse_1.
+
+26
+00:02:22,180 --> 00:02:29,760
+At time T equals 20, it is removed from storage 
+and mounted into the front suspension slot of vehicle_1.
+
+27
+00:02:30,480 --> 00:02:36,920
+At time T equals 50, a routine inspection
+logs a minor defect, a 2 millimeter crack.
+
+28
+00:02:36,920 --> 00:02:43,740
+Finally, at time T equals 80, the crack
+propagates to a critical 15
+
+29
+00:02:43,740 --> 00:02:50,280
+millimeters. The arm is dismantled from
+vehicle_1 and returned to warehouse_1 for
+
+30
+00:02:50,280 --> 00:02:51,680
+a warranty investigation.
+
+31
+00:02:54,180 --> 00:03:01,000
+Let us enable Show Closed History and step
+into quadrant one, BFO in 3D combined
+
+32
+00:03:01,000 --> 00:03:02,480
+with a labeled property graph.
+
+33
+00:03:05,260 --> 00:03:08,820
+Look at the canvas in BFO plus LPG mode.
+
+34
+00:03:10,560 --> 00:03:14,920
+Why is this first quadrant the darling of
+internal R&D software teams?
+
+35
+00:03:17,040 --> 00:03:19,880
+Because it aligns with everyday human
+intuition.
+
+36
+00:03:20,800 --> 00:03:27,380
+Vehicle_1, the functional slot, ARM_SN_404,
+
+37
+00:03:27,380 --> 00:03:34,440
+and warehouse_1 sit on the canvas as
+single permanent boxes, material entities.
+
+38
+00:03:35,480 --> 00:03:39,680
+Even though the suspension arm moved from
+the warehouse to the vehicle and back,
+
+39
+00:03:39,680 --> 00:03:44,880
+there is still only one node for
+ARM_SN_404.
+
+40
+00:03:46,940 --> 00:03:48,240
+Where does the history live?
+
+41
+00:03:48,880 --> 00:03:50,480
+Look directly at the edges.
+
+42
+00:03:51,260 --> 00:03:56,520
+Because an LPG engine natively supports
+key-value properties on relationships, the
+
+43
+00:03:56,520 --> 00:03:58,840
+temporal intervals sit right on the
+arrows.
+
+44
+00:03:59,500 --> 00:04:05,320
+Mounted_in carries valid from T20, valid
+to T80.
+
+45
+00:04:07,260 --> 00:04:11,060
+Let us evaluate quadrant one against our
+engineering criteria.
+
+46
+00:04:12,920 --> 00:04:16,800
+First, query ergonomics and computational
+performance.
+
+47
+00:04:18,459 --> 00:04:23,040
+Look at the Cypher query in the lower
+right panel. It is remarkably compact.
+
+48
+00:04:23,760 --> 00:04:29,080
+Because LPG databases use index-free
+adjacency, traversing from vehicle_1
+
+49
+00:04:30,040 --> 00:04:35,040
+through the slot to the part and filtering
+by edge timestamps takes microseconds.
+
+50
+00:04:37,220 --> 00:04:40,180
+Second, IT and developer onboarding.
+
+51
+00:04:42,040 --> 00:04:46,640
+Any software engineer familiar with JSON
+and object-oriented programming can
+
+52
+00:04:46,640 --> 00:04:48,580
+understand this graph in an afternoon.
+
+53
+00:04:51,200 --> 00:04:53,400
+So where does quadrant one break down?
+
+54
+00:04:55,160 --> 00:04:58,260
+It hits a wall in two specific boundary
+cases.
+
+55
+00:04:59,840 --> 00:05:03,540
+Boundary case one, multi-supplier data federation.
+
+56
+00:05:05,360 --> 00:05:12,320
+Suppose ARM_SN_404 is manufactured by a
+tier-one supplier
+
+57
+00:05:12,320 --> 00:05:18,760
+in Poland, assembled by an OEM in Germany,
+and serviced by a fleet operator in Sweden.
+
+58
+00:05:19,560 --> 00:05:27,140
+In an LPG database, node labels and edge properties 
+are local strings, not globally dereferencable URIs.
+
+59
+00:05:27,960 --> 00:05:32,880
+When the supplier exports their internal
+LPG data, their property is called
+
+60
+00:05:32,880 --> 00:05:37,240
+floor_length, while your Cypher query
+expects crack.
+
+61
+00:05:38,040 --> 00:05:43,860
+There is no built-in W3C semantic layer to
+align vocabularies or validate schemas
+
+62
+00:05:43,860 --> 00:05:45,140
+across company borders.
+
+63
+00:05:45,880 --> 00:05:50,920
+You end up writing brittle custom Python
+ETL scripts for every single supplier.
+
+64
+00:05:53,060 --> 00:05:56,920
+Boundary case two, 
+state-dependent property evolution.
+
+65
+00:05:58,380 --> 00:06:01,780
+In BFO 3D, the part node is timeless.
+
+66
+00:06:02,516 --> 00:06:08,796
+When the crack grows from 2 millimeters at
+T50 to 15 millimeters at T80, or when the
+
+67
+00:06:08,796 --> 00:06:12,776
+surface temperature of the part
+fluctuates, attaching those changing
+
+68
+00:06:12,776 --> 00:06:16,476
+values to a single 3D continuant node
+becomes awkward.
+
+69
+00:06:17,176 --> 00:06:21,076
+You are forced to spawn separate quality
+nodes for every measurement episode.
+
+70
+00:06:23,636 --> 00:06:27,416
+To solve the cross-supplier
+interoperability problem while keeping our
+
+71
+00:06:27,416 --> 00:06:32,216
+3D intuitive worldview,
+enterprises often move to quadrant two,
+
+72
+00:06:32,976 --> 00:06:37,616
+BFO in 3D combined with W3CRDF triples.
+
+73
+00:06:39,836 --> 00:06:43,956
+Watch what happens to the exact same
+dataset when we switch the physical
+
+74
+00:06:43,976 --> 00:06:46,036
+perspective to physical RDF.
+
+75
+00:06:48,736 --> 00:06:54,996
+The clean 3D graph suddenly explodes into
+a web of yellow hexagons and white literal ovals.
+
+76
+00:06:55,756 --> 00:06:57,676
+Why did the graph triple in size?
+
+77
+00:07:00,596 --> 00:07:05,376
+This is the classic friction between a 3D
+ontology and a pure triple store.
+
+78
+00:07:06,976 --> 00:07:11,694
+In BFO, two three-dimensional objects, the
+part and the slot, 
+
+79
+00:07:11,694 --> 00:07:16,756
+are connected over a specific time window 
+from T20 to T80.
+
+80
+00:07:18,516 --> 00:07:23,496
+In LPG, we simply tucked T20 and T80
+inside the edge.
+
+81
+00:07:24,976 --> 00:07:31,516
+But in strict W3CRDF, edges are binary
+predicates. A predicate cannot hold
+
+82
+00:07:31,516 --> 00:07:36,296
+properties. You cannot attach a timestamp
+to an arrow in standard RDF.
+
+83
+00:07:37,176 --> 00:07:44,136
+Therefore, to express ARM_SN_404 was
+mounted in the slot from
+
+84
+00:07:44,136 --> 00:07:50,696
+T20 to T80, the database must reify the
+relationship. It creates an artificial
+
+85
+00:07:50,696 --> 00:07:56,696
+intermediate node, an RDF statement
+hexagon, and fires out four separate triples:
+
+86
+00:07:57,336 --> 00:07:59,616
+RDF subject pointing to the part,
+
+87
+00:08:00,296 --> 00:08:06,016
+RDF object pointing to the slot, valid
+from pointing to the integer literal 20,
+
+88
+00:08:06,536 --> 00:08:09,636
+and valid to pointing to the integer
+literal 80.
+
+89
+00:08:11,596 --> 00:08:15,096
+Let us score quadrant two against our
+operational criteria.
+
+90
+00:08:16,836 --> 00:08:17,836
+Where does it shine?
+
+91
+00:08:19,436 --> 00:08:23,836
+In semantic governance and NATO or
+defense-grade standardization.
+
+92
+00:08:24,556 --> 00:08:31,196
+Every class, every BFO relation, and every
+unit of measure has a globally unique URI.
+
+93
+00:08:31,896 --> 00:08:36,536
+You can hand a formal OWL ontology and
+SHACL validation shapes to 20
+
+94
+00:08:36,536 --> 00:08:40,776
+international contractors, and an
+automated reasoner will mathematically
+
+95
+00:08:40,776 --> 00:08:44,976
+verify whether their delivered data
+complies with your contract before a
+
+96
+00:08:44,976 --> 00:08:46,936
+single byte enters your repository.
+
+97
+00:08:49,796 --> 00:08:53,016
+Where does quadrant two become an
+operational nightmare?
+
+98
+00:08:54,816 --> 00:08:58,016
+Look at the SPARQL query panel and the
+relationship store.
+
+99
+00:09:01,056 --> 00:09:06,356
+First, every time a technician logs an
+assembly action, the database writes five
+
+100
+00:09:06,356 --> 00:09:08,816
+to six triples instead of one edge.
+
+101
+00:09:11,596 --> 00:09:18,136
+Second, to answer a simple temporal BOM
+query at time T, the query engine cannot
+
+102
+00:09:18,136 --> 00:09:23,816
+simply hop from node to node. It must
+execute expensive relational joins across
+
+103
+00:09:23,816 --> 00:09:27,396
+thousands of reified statement nodes and
+literal values.
+
+104
+00:09:30,136 --> 00:09:35,656
+Third, try explaining to a pragmatic
+manufacturing IT supplier why they cannot
+
+105
+00:09:35,656 --> 00:09:41,056
+just send you a parent-child table and why
+they must instantiate blank reification
+
+106
+00:09:41,056 --> 00:09:43,196
+nodes for every bolt in an assembly.
+
+107
+00:09:43,856 --> 00:09:47,596
+The cognitive tension with traditional IT
+vendors is immense.
+
+108
+00:09:50,496 --> 00:09:55,616
+Now, what if our engineering problem is
+not just tracking where a part is, but
+
+109
+00:09:55,616 --> 00:10:00,716
+auditing the exact historical configuration 
+of a complex system when a failure occurred?
+
+110
+00:10:02,916 --> 00:10:04,656
+This brings us to quadrant three,
+
+111
+00:10:05,456 --> 00:10:11,276
+ISO 15926 in 4D combined with a labeled
+property graph.
+
+112
+00:10:13,016 --> 00:10:20,036
+Let us switch the ontology to ISO 15926
+and the perspective to physical LPG.
+
+113
+00:10:22,316 --> 00:10:27,416
+Look closely at the topology on the
+canvas. The philosophical shift is radical.
+
+114
+00:10:29,056 --> 00:10:34,535
+In ISO 15926, the blue node, ARM_SN_404_4D, 
+
+115
+00:10:34,535 --> 00:10:42,256
+is no longer a 3D physical 
+piece of metal sitting on a shelf.
+
+116
+00:10:43,016 --> 00:10:44,956
+It is the whole life individual,
+
+117
+00:10:45,616 --> 00:10:50,576
+the entire four-dimensional spacetime worm
+of that suspension arm from the day it
+
+118
+00:10:50,576 --> 00:10:54,236
+was cast in the foundry to the day it is
+melted down as scrap.
+
+119
+00:10:56,756 --> 00:11:03,216
+And notice, the 4D worm itself never participates 
+directly in any assembly or defect.
+
+120
+00:11:05,496 --> 00:11:11,596
+Instead, every time reality changes, at
+T10 in the warehouse, at T20 in the
+
+121
+00:11:11,596 --> 00:11:18,176
+vehicle, at T80 back in the warehouse, the
+system slices a new green or gray state
+
+122
+00:11:18,176 --> 00:11:22,256
+node linked to the 4D parent via temporal
+part of.
+
+123
+00:11:24,676 --> 00:11:26,616
+Look at where the timestamps live now.
+
+124
+00:11:28,536 --> 00:11:34,976
+The edges, mounted_in, has_slot,
+stored_at,
+
+125
+00:11:35,476 --> 00:11:39,096
+are completely clean. They carry no
+timestamps at all.
+
+126
+00:11:39,716 --> 00:11:46,256
+Instead, the time window, T20 to T80, is
+an intrinsic property of the state node
+
+127
+00:11:46,256 --> 00:11:53,216
+itself, and physical LPG edges called
+transition_to link consecutive states
+
+128
+00:11:53,216 --> 00:11:54,736
+into a chronological chain.
+
+129
+00:11:56,756 --> 00:12:00,116
+Why would an engineering organization
+choose quadrant three?
+
+130
+00:12:01,816 --> 00:12:06,576
+Because it makes historical state auditing
+and configuration management bulletproof.
+
+131
+00:12:08,844 --> 00:12:15,564
+In a 3D graph, if vehicle_1 undergoes 50
+component swaps, reconstructing the
+
+132
+00:12:15,564 --> 00:12:21,304
+exact state of the vehicle at time T50
+requires evaluating overlapping intervals
+
+133
+00:12:21,304 --> 00:12:22,624
+on dozens of edges.
+
+134
+00:12:23,424 --> 00:12:27,744
+In ISO 15926 plus LPG,
+
+135
+00:12:27,784 --> 00:12:33,369
+a state is an immutable first-class node.
+The 2 millimeter crack at T50 
+
+136
+00:12:33,369 --> 00:12:40,504
+is permanently bound to the specific 
+temporal slice of ARM_SN_404 that
+
+137
+00:12:40,504 --> 00:12:45,824
+existed while it was mounted in the
+temporal slice of vehicle_1. When the part
+
+138
+00:12:45,824 --> 00:12:53,264
+moves to the warehouse at T80, a new state slice 
+is born, linked by a direct transition_to pointer.
+
+139
+00:12:56,084 --> 00:13:01,884
+For an internal digital twin running on a
+high-performance LPG engine like Neo4j or
+
+140
+00:13:01,884 --> 00:13:08,344
+Memgraph, traversing state transitions
+along transition_to edges is blazingly
+
+141
+00:13:08,344 --> 00:13:12,284
+fast, and historical data corruption is
+structurally impossible.
+
+142
+00:13:15,444 --> 00:13:17,364
+Where does quadrant three collapse?
+
+143
+00:13:18,864 --> 00:13:21,144
+Look at the node store table under the
+bonnet.
+
+144
+00:13:24,524 --> 00:13:27,704
+This is the infamous 4D state explosion.
+
+145
+00:13:29,964 --> 00:13:35,904
+In our tiny toy example with one vehicle,
+one part, and three lifecycle events, we
+
+146
+00:13:35,904 --> 00:13:37,864
+already have over a dozen nodes.
+
+147
+00:13:38,664 --> 00:13:45,024
+Now imagine a real railway locomotive or
+an aircraft with 50,000 serialized parts.
+
+148
+00:13:45,864 --> 00:13:51,004
+Every time a maintenance technician swaps
+a single sensor or updates a calibration parameter,
+
+149
+00:13:51,704 --> 00:13:57,484
+strict 4D mereology dictates that a new
+temporal state slice must be created, not
+
+150
+00:13:57,484 --> 00:14:02,444
+only for the sensor, but for the sub-assembly, 
+the module, and the vehicle itself.
+
+151
+00:14:03,424 --> 00:14:09,124
+Within a year of fleet operation, your LPG
+database is flooded with tens of millions
+
+152
+00:14:09,124 --> 00:14:10,644
+of historical state nodes.
+
+153
+00:14:11,344 --> 00:14:14,744
+Furthermore, because it is stored in a
+schema-light LPG,
+
+154
+00:14:15,364 --> 00:14:19,703
+if a junior developer forgets to close a
+previous state timestamp when creating a
+
+155
+00:14:19,703 --> 00:14:25,564
+new slice, the 4D worm forks into parallel
+timelines, and there is no formal
+
+156
+00:14:25,564 --> 00:14:28,824
+ontological reasoner in LPG to catch the
+paradox.
+
+157
+00:14:30,824 --> 00:14:33,204
+Finally, let us enter quadrant four,
+
+158
+00:14:34,104 --> 00:14:40,964
+ISO 15926 in 4D combined with W3CRDF
+triples.
+
+159
+00:14:42,764 --> 00:14:48,844
+Switch the perspective to physical RDF
+while staying in ISO 15926.
+
+160
+00:14:50,644 --> 00:14:51,644
+Look at the canvas.
+
+161
+00:14:52,384 --> 00:14:57,024
+This is the heavy artillery of industrial
+knowledge architecture, born in the
+
+162
+00:14:57,024 --> 00:15:00,704
+offshore oil, gas, and nuclear engineering
+mega projects.
+
+163
+00:15:01,504 --> 00:15:07,684
+Here, every 4D whole-life individual,
+every temporal state slice, every defect
+
+164
+00:15:07,684 --> 00:15:12,134
+classification, and every literal
+timestamp is decomposed 
+
+165
+00:15:12,134 --> 00:15:15,124
+into pure immutable W3C triples.
+
+166
+00:15:15,944 --> 00:15:24,684
+Notice an intriguing detail when you compare 
+BFO plus RDF against ISO 15926 plus RDF.
+
+167
+00:15:26,804 --> 00:15:33,644
+In ISO 15926 plus RDF, we did not need
+artificial RDF colon
+
+168
+00:15:33,724 --> 00:15:36,904
+statement reification nodes for our
+assembly relationships.
+
+169
+00:15:37,564 --> 00:15:43,764
+Why? Because the 4D ontology already
+turned time into a node, the state slice.
+
+170
+00:15:44,484 --> 00:15:51,084
+Therefore, attaching ISO valid from and
+ISO valid to as standard RDF literals
+
+171
+00:15:51,084 --> 00:15:55,364
+directly to the state node is 100% native
+to the triple model.
+
+172
+00:15:56,084 --> 00:16:01,044
+The 4D ontology and the RDF triple store
+are mathematically made for each other.
+
+173
+00:16:03,224 --> 00:16:06,144
+When is quadrant four the only viable
+choice?
+
+174
+00:16:07,884 --> 00:16:13,104
+When you are building a multi-decade,
+multi-consortium digital thread, such as a
+
+175
+00:16:13,104 --> 00:16:18,204
+nuclear power plant, a national rail
+infrastructure, or a defense fleet, where
+
+176
+00:16:18,424 --> 00:16:24,364
+50 tier one contractors must exchange
+configuration history over 40 years, long
+
+177
+00:16:24,364 --> 00:16:28,704
+after today's software vendors and
+proprietary databases have ceased to exist.
+
+178
+00:16:29,664 --> 00:16:32,464
+Every state slice has a permanent URI.
+
+179
+00:16:33,424 --> 00:16:39,704
+Reference data libraries, RDLs, define
+every engineering concept globally. You
+
+180
+00:16:39,704 --> 00:16:44,844
+can merge RDF graphs from 10 different
+suppliers into a single repository without
+
+181
+00:16:44,844 --> 00:16:49,524
+a single ID collision and run
+mathematical reasoners over the entire
+
+182
+00:16:49,524 --> 00:16:51,784
+40-year history of every part.
+
+183
+00:16:53,584 --> 00:16:55,684
+And what is the price of quadrant four?
+
+184
+00:16:57,284 --> 00:17:00,924
+Look at the sheer density of the diagram
+and the SPARQL query.
+
+185
+00:17:03,584 --> 00:17:07,804
+First, extreme cognitive and ontological
+maintenance cost.
+
+186
+00:17:09,564 --> 00:17:12,944
+You cannot hire regular web developers to
+maintain this system.
+
+187
+00:17:13,604 --> 00:17:18,782
+You need rare specialists who understand
+both four-dimensional mereotopology 
+
+188
+00:17:18,782 --> 00:17:21,144
+and W3C semantic web stack.
+
+189
+00:17:21,964 --> 00:17:26,444
+Explaining to a mid-sized mechanical
+supplier that they cannot simply report
+
+190
+00:17:26,444 --> 00:17:31,764
+part A is in vehicle one, but must
+instantiate a temporal part of triple
+
+191
+00:17:31,764 --> 00:17:37,184
+linking two spatiotemporal extents to an
+RDL class will stall your supply chain
+
+192
+00:17:37,184 --> 00:17:41,384
+onboarding for months unless you build
+thick translation middleware for them.
+
+193
+00:17:44,124 --> 00:17:46,884
+Second, compute and query latency.
+
+194
+00:17:48,624 --> 00:17:54,224
+Even a simple bill of materials tree
+requires joining 4D individuals, active
+
+195
+00:17:54,224 --> 00:17:59,024
+state slices, slot states, and literal
+filters across millions of triples.
+
+196
+00:17:59,704 --> 00:18:04,624
+Without aggressive caching or hybrid
+views, real-time operational dashboards
+
+197
+00:18:04,624 --> 00:18:05,904
+will grind to a halt.
+
+198
+00:18:08,764 --> 00:18:13,924
+Let us return to the engineer viewpoint,
+SMRM, to conclude.
+
+199
+00:18:15,144 --> 00:18:20,204
+Notice that as soon as we click engineer
+viewpoint, all four quadrants collapse
+
+200
+00:18:20,204 --> 00:18:24,444
+back into the exact same clean three-node
+engineering diagram.
+
+201
+00:18:25,324 --> 00:18:29,464
+That is the ultimate lesson of IEC 63339.
+
+202
+00:18:30,984 --> 00:18:35,924
+Your field technicians, CAD designers, and
+fleet operators should never be forced to
+
+203
+00:18:35,924 --> 00:18:38,464
+suffer the complexity of your storage
+quadrant.
+
+204
+00:18:40,804 --> 00:18:45,004
+If you are building a fast internal
+engineering tracker inside one company,
+
+205
+00:18:45,644 --> 00:18:49,164
+start in quadrant one with BFO and LPG.
+
+206
+00:18:50,044 --> 00:18:54,344
+If you need strict cross-enterprise
+vocabulary validation and semantic
+
+207
+00:18:54,344 --> 00:19:00,904
+reasoning over intuitive 3D concepts,
+choose quadrant two with BFO and RDF.
+
+208
+00:19:01,804 --> 00:19:06,644
+If you need high-speed, uncorruptible
+audit trails of complex state transitions
+
+209
+00:19:06,644 --> 00:19:13,144
+inside a high-performance graph database,
+build in quadrant three with 4D states in LPG.
+
+210
+00:19:13,944 --> 00:19:19,404
+And if you are architecting a 30-year
+multi-supplier industrial ecosystem where
+
+211
+00:19:19,404 --> 00:19:24,544
+mathematical unambiguity across
+organizations outweighs everything else,
+
+212
+00:19:24,544 --> 00:19:27,184
+invest in the heavy machinery of quadrant
+four,
+
+213
+00:19:27,844 --> 00:19:35,984
+ISO 15926 over RDF, and hide that
+complexity behind a clean SMRM user interface.
