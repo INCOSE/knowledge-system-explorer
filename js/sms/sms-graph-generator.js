@@ -1,311 +1,221 @@
 /**
- * SMS LAYER: PHYSICAL GRAPH GENERATOR
- * -----------------------------------
- * Transforms a canonical Semantic Graph (SMIM) into physical storage (SMS) per IEC 63339.
- * - RDF Mode: Reifies binary relations carrying temporal/custom properties into W3C
- *   statement nodes and extracts scalar properties into explicit RDF Literal nodes.
- * - LPG Mode: Links sequential 4D states of the same entity via TRANSITION_TO edges.
+ * SMS PHYSICAL GRAPH GENERATOR (LPG & W3C RDF)
+ * --------------------------------------------
+ * Transforms the Logical (SMIM) semantic graph into its exact physical
+ * database representation:
+ * - LPG: Property-bearing nodes & edges (with NEXT_STATE / TRANSITION_TO in 4D).
+ * - RDF: Strict W3C triples (Subject -> Predicate -> Object/Literal) with
+ *        zero edge properties and explicit rdf:Statement reification nodes.
+ * 
+ * Architecture Note: This module is fully autonomous. It does not import
+ * domain definitions. It relies entirely on the topological structure provided
+ * by the SMIM layer.
  */
 
-import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
+export function generatePhysicalGraph(semanticGraph, storageType = 'LPG') {
+  if (!semanticGraph) return { nodes: [], edges: [] };
 
-/**
- * Generates a physical graph projection from a canonical semantic graph.
- *
- * @param {Object} semanticGraph - Standardised Semantic Graph ({ nodes: Array, edges: Array }).
- * @param {'LPG'|'RDF'} storageMode - Physical storage paradigm ('LPG' or 'RDF').
- * @returns {{ nodes: Array, edges: Array }} Transformed physical graph.
- */
-export function generatePhysicalGraph(semanticGraph, storageMode) {
-  if (!semanticGraph || !Array.isArray(semanticGraph.nodes) || !Array.isArray(semanticGraph.edges)) {
-    return { nodes: [], edges: [] };
+  // Deep clone so we don't mutate the logical SMIM graph
+  const clonedNodes = JSON.parse(JSON.stringify(semanticGraph.nodes || []));
+  const clonedEdges = JSON.parse(JSON.stringify(semanticGraph.edges || []));
+
+  if (storageType === 'LPG') {
+    return buildPhysicalLpgGraph(clonedNodes, clonedEdges);
   }
+  return buildPhysicalRdfGraph(clonedNodes, clonedEdges);
+}
 
-  const physicalNodes = semanticGraph.nodes.map(node => ({
-    ...node,
-    properties: node.properties ? { ...node.properties } : {}
-  }));
+function buildPhysicalLpgGraph(nodes, edges) {
+  const isIso15926 = nodes.some(n => n.type === 'ActualIndividual' || n.type === 'State');
 
-  const physicalEdges = semanticGraph.edges.map(edge => ({
-    ...edge,
-    properties: edge.properties ? { ...edge.properties } : {}
-  }));
+  if (isIso15926) {
+    // In ISO 15926 LPG, temporal bounds live on :State (and :Defect) nodes, NOT on structural edges.
+    // We enforce this ontological rule at the physical layer.
+    edges.forEach(e => {
+      if (e.properties && e.type !== 'transition' && e.label !== 'TRANSITION_TO') {
+        delete e.properties.validFrom;
+        delete e.properties.validTo;
+      }
+    });
 
-  const is4D = physicalNodes.some(n => n.type === 'State' || n.type === 'ActualIndividual');
-
-  // =========================================================================
-  // CASE 1: W3C RDF Mode (Triples, Statement Reification & Explicit Literals)
-  // =========================================================================
-  if (storageMode === 'RDF') {
-    if (is4D) {
-      // In 4D RDF, States and Defects cannot hold internal property maps;
-      // their timestamps and values are persisted as explicit RDF Literal nodes.
-      const rdf4dNodes = [];
-      const rdf4dEdges = [...physicalEdges];
-
-      physicalNodes.forEach(node => {
-        rdf4dNodes.push(node);
-
-        if (node.type === 'State') {
-          const vFrom = node.properties?.validFrom;
-          const vTo = node.properties?.validTo;
-          const isCurrent = node.properties?.isCurrent !== false;
-
-          if (vFrom !== undefined && vFrom !== null) {
-            const litFromId = `lit_vf_${node.id}`;
-            rdf4dNodes.push({
-              id: litFromId,
-              label: `"${vFrom}"^^xsd:integer`,
-              type: 'Literal',
-              properties: { value: vFrom }
-            });
-            rdf4dEdges.push({
-              id: `edge_vf_${node.id}`,
-              from: node.id,
-              to: litFromId,
-              label: 'iso:validFrom',
-              type: 'predicate',
-              properties: { isCurrent }
-            });
-          }
-
-          if (vTo !== undefined && vTo !== null) {
-            const litToId = `lit_vt_${node.id}`;
-            rdf4dNodes.push({
-              id: litToId,
-              label: `"${vTo}"^^xsd:integer`,
-              type: 'Literal',
-              properties: { value: vTo }
-            });
-            rdf4dEdges.push({
-              id: `edge_vt_${node.id}`,
-              from: node.id,
-              to: litToId,
-              label: 'iso:validTo',
-              type: 'predicate',
-              properties: { isCurrent: false }
-            });
-          }
-        } else if (node.type === 'Defect' && node.properties?.value) {
-          const litValId = `lit_val_${node.id}`;
-          rdf4dNodes.push({
-            id: litValId,
-            label: `"${node.properties.value}"^^xsd:string`,
-            type: 'Literal',
-            properties: { value: node.properties.value }
-          });
-          rdf4dEdges.push({
-            id: `edge_val_${node.id}`,
-            from: node.id,
-            to: litValId,
-            label: 'iso:severity',
-            type: 'predicate',
-            properties: { isCurrent: node.properties?.isCurrent !== false }
-          });
+    // Add explicit physical TRANSITION_TO links between consecutive states of the same 4D individual.
+    // We infer ownership entirely via the 'temporalPartOf' relationship structure provided by SMIM.
+    const statesByIndividual = {};
+    edges.forEach(e => {
+      if (e.label === 'temporalPartOf') {
+        const stateNode = nodes.find(n => n.id === e.from);
+        if (stateNode) {
+          if (!statesByIndividual[e.to]) statesByIndividual[e.to] = [];
+          statesByIndividual[e.to].push(stateNode);
         }
+      }
+    });
+
+    Object.values(statesByIndividual).forEach(stateList => {
+      // Stable sort: primary by validFrom time, secondary by node ID for determinism
+      stateList.sort((a, b) => {
+        const timeA = a.properties?.validFrom ?? 0;
+        const timeB = b.properties?.validFrom ?? 0;
+        if (timeA !== timeB) return timeA - timeB;
+        return a.id.localeCompare(b.id);
       });
 
-      return { nodes: rdf4dNodes, edges: rdf4dEdges };
-    }
-
-    // 3D BFO and Naive Graph RDF Reification
-    const finalEdges = [];
-
-    // Extract custom properties on nodes (e.g. Naive Node crack="2mm") into RDF Literals
-    physicalNodes.slice().forEach(node => {
-      if (node.properties) {
-        Object.entries(node.properties).forEach(([k, v]) => {
-          if (!INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null) {
-            const litId = `lit_node_${node.id}_${k}`;
-            physicalNodes.push({
-              id: litId,
-              label: `"${v}"^^xsd:string`,
-              type: 'Literal',
-              properties: { value: v }
-            });
-            finalEdges.push({
-              id: `rel_lit_${node.id}_${k}`,
-              from: node.id,
-              to: litId,
-              label: `:${k}`,
-              type: 'predicate',
-              properties: { isCurrent: true }
-            });
-          }
-        });
-      }
-    });
-
-    physicalEdges.forEach(edge => {
-      const hasTemporalProps = edge.properties && (
-        edge.properties.validFrom !== undefined ||
-        edge.properties.validTo !== undefined
-      );
-      const isReifiableRelation = [
-        'composition',
-        'mounted_in',
-        'has_slot',
-        'stored_at',
-        'has_part'
-      ].includes(edge.type) || [
-        'mounted_in',
-        'has_slot',
-        'stored_at',
-        'has_part'
-      ].includes(edge.label);
-
-      if (isReifiableRelation && hasTemporalProps) {
-        const stmtId = `stmt_${edge.id}`;
-        const isCurrent = edge.properties.isCurrent !== false;
-        const rel = edge.label || edge.type;
-
-        // Correct semantic directionality:
-        // For mounted_in / stored_at, edge.from is the Child (Part) and edge.to is the Parent (Slot/Warehouse).
-        // For has_slot / has_part, edge.from is the Parent and edge.to is the Child.
-        const isChildToParent = rel === 'mounted_in' || rel === 'stored_at';
-        const parentNodeId = isChildToParent ? edge.to : edge.from;
-        const childNodeId = isChildToParent ? edge.from : edge.to;
-
-        physicalNodes.push({
-          id: stmtId,
-          label: `_:${edge.id}`,
-          type: 'RelationalQuality',
-          properties: { isCurrent, originalEdgeId: edge.id }
-        });
-
-        finalEdges.push({
-          id: `rel_p_${edge.id}`,
-          from: stmtId,
-          to: parentNodeId,
-          label: ':hasParent',
-          type: 'reification',
-          properties: { isCurrent }
-        });
-
-        finalEdges.push({
-          id: `rel_c_${edge.id}`,
-          from: stmtId,
-          to: childNodeId,
-          label: ':hasChild',
-          type: 'reification',
-          properties: { isCurrent }
-        });
-
-        if (edge.properties.validFrom !== undefined && edge.properties.validFrom !== null) {
-          const litFromId = `lit_vf_${edge.id}`;
-          physicalNodes.push({
-            id: litFromId,
-            label: `"${edge.properties.validFrom}"^^xsd:integer`,
-            type: 'Literal',
-            properties: { value: edge.properties.validFrom }
-          });
-          finalEdges.push({
-            id: `rel_vf_${edge.id}`,
-            from: stmtId,
-            to: litFromId,
-            label: ':validFrom',
-            type: 'reification',
-            properties: { isCurrent }
-          });
-        }
-
-        if (edge.properties.validTo !== undefined && edge.properties.validTo !== null) {
-          const litToId = `lit_vt_${edge.id}`;
-          physicalNodes.push({
-            id: litToId,
-            label: `"${edge.properties.validTo}"^^xsd:integer`,
-            type: 'Literal',
-            properties: { value: edge.properties.validTo }
-          });
-          finalEdges.push({
-            id: `rel_vt_${edge.id}`,
-            from: stmtId,
-            to: litToId,
-            label: ':validTo',
-            type: 'reification',
-            properties: { isCurrent: false }
-          });
-        }
-
-        // Also reify custom edge properties (e.g. crack="2mm" in NAIVE_EDGE mode)
-        Object.entries(edge.properties).forEach(([k, v]) => {
-          if (!INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null) {
-            const litPropId = `lit_prop_${edge.id}_${k}`;
-            physicalNodes.push({
-              id: litPropId,
-              label: `"${v}"^^xsd:string`,
-              type: 'Literal',
-              properties: { value: v }
-            });
-            finalEdges.push({
-              id: `rel_prop_${edge.id}_${k}`,
-              from: stmtId,
-              to: litPropId,
-              label: `:${k}`,
-              type: 'reification',
-              properties: { isCurrent }
-            });
-          }
-        });
-      } else {
-        finalEdges.push(edge);
-      }
-    });
-
-    return { nodes: physicalNodes, edges: finalEdges };
-  }
-
-  // =========================================================================
-  // CASE 2: Labeled Property Graph (LPG) Mode
-  // =========================================================================
-  if (storageMode === 'LPG' && is4D) {
-    const stateNodes = physicalNodes.filter(n => n.type === 'State');
-    const entityStates = new Map();
-
-    stateNodes.forEach(stateNode => {
-      let ownerId = stateNode.properties?.ownerId;
-      if (!ownerId) {
-        const tpoEdge = physicalEdges.find(e => e.from === stateNode.id && e.label === 'temporalPartOf');
-        if (tpoEdge) ownerId = tpoEdge.to.replace(/^4d_/, '');
-      }
-
-      if (ownerId) {
-        if (!entityStates.has(ownerId)) entityStates.set(ownerId, []);
-        entityStates.get(ownerId).push(stateNode);
-      }
-    });
-
-    entityStates.forEach((states, ownerId) => {
-      states.sort((a, b) => {
-        const fromA = a.properties?.validFrom ?? 0;
-        const fromB = b.properties?.validFrom ?? 0;
-        return fromA !== fromB ? fromA - fromB : a.id.localeCompare(b.id);
-      });
-
-      for (let i = 0; i < states.length - 1; i++) {
-        const currState = states[i];
-        const nextState = states[i + 1];
-        const transitionEdgeId = `trans_${ownerId}_${i}`;
-
-        if (!physicalEdges.some(e => e.id === transitionEdgeId)) {
-          physicalEdges.push({
-            id: transitionEdgeId,
-            from: currState.id,
-            to: nextState.id,
+      for (let i = 0; i < stateList.length - 1; i++) {
+        const s1 = stateList[i];
+        const s2 = stateList[i + 1];
+        const transId = `lpg_trans_${s1.id}_${s2.id}`;
+        if (!edges.some(e => e.id === transId)) {
+          edges.push({
+            id: transId,
+            from: s1.id,
+            to: s2.id,
             label: 'TRANSITION_TO',
             type: 'transition',
             properties: {
-              atTime: nextState.properties?.validFrom,
-              validFrom: nextState.properties?.validFrom,
-              isCurrent: nextState.properties?.isCurrent ?? true
+              atTime: s2.properties?.validFrom,
+              isCurrent: true
             }
           });
         }
       }
     });
-
-    return { nodes: physicalNodes, edges: physicalEdges };
+  } else {
+    // In BFO LPG, temporal bounds live on the relational edges (mounted_in, inheres_in, etc.),
+    // so strip redundant validFrom/validTo from Quality nodes to avoid double printing on the visual canvas.
+    nodes.forEach(n => {
+      if (n.type === 'Quality' || n.type === 'DependentContinuant') {
+        if (n.properties) {
+          delete n.properties.validFrom;
+          delete n.properties.validTo;
+        }
+      }
+    });
   }
 
-  return { nodes: physicalNodes, edges: physicalEdges };
+  return { nodes, edges };
+}
+
+function buildPhysicalRdfGraph(nodes, edges) {
+  const rdfNodes = [];
+  const rdfEdges = [];
+  const isIso15926 = nodes.some(n => n.type === 'ActualIndividual' || n.type === 'State');
+
+  // Helper to construct W3C standard Literal nodes
+  const addLiteral = (parentId, predicateLabel, rawValue, datatype = 'xsd:string', suffix = '') => {
+    if (rawValue === undefined || rawValue === null) return;
+    const litId = `lit_${parentId}_${predicateLabel.replace(/[^a-zA-Z0-9]/g, '')}_${suffix}`;
+    const formattedVal = `"${rawValue}"^^${datatype}`;
+    if (!rdfNodes.some(n => n.id === litId)) {
+      rdfNodes.push({
+        id: litId,
+        label: formattedVal,
+        type: 'Literal',
+        properties: { isCurrent: true }
+      });
+    }
+    rdfEdges.push({
+      id: `rdf_e_${litId}`,
+      from: parentId,
+      to: litId,
+      label: predicateLabel,
+      type: 'predicate',
+      properties: { isCurrent: true }
+    });
+  };
+
+  // 1. Process Nodes -> strip internal properties into explicit RDF Literals
+  nodes.forEach(node => {
+    const props = node.properties || {};
+    const vf = props.validFrom;
+    const vt = props.validTo;
+
+    // Clean node copy without inline properties (in RDF, a URI node is just an identifier)
+    const cleanNode = {
+      id: node.id,
+      label: node.label || node.id,
+      type: node.type,
+      properties: {
+        isCurrent: props.isCurrent !== false,
+        entityClass: props.entityClass,
+        entityType: props.entityType
+      }
+    };
+    rdfNodes.push(cleanNode);
+
+    // Extract temporal bounds based on Ontology rules
+    if (isIso15926 && (node.type === 'State' || node.type === 'Defect')) {
+        if (vf !== undefined) addLiteral(node.id, 'iso:validFrom', vf, 'xsd:integer', 'vf');
+        if (vt !== undefined && vt !== null) addLiteral(node.id, 'iso:validTo', vt, 'xsd:integer', 'vt');
+    } else if (!isIso15926 && (node.type === 'Quality' || node.type === 'Defect')) {
+        if (vf !== undefined) addLiteral(node.id, ':validFrom', vf, 'xsd:integer', 'vf');
+        if (vt !== undefined && vt !== null) addLiteral(node.id, ':validTo', vt, 'xsd:integer', 'vt');
+    }
+
+    // Extract any other custom domain properties (e.g. crack size, severity) into Literals.
+    // We ignore system keys to maintain autonomy from definitions.js
+    const systemKeys = ['validFrom', 'validTo', 'isCurrent', 'entityClass', 'entityType'];
+    Object.entries(props).forEach(([k, v]) => {
+      if (!systemKeys.includes(k)) {
+         const prefix = isIso15926 ? 'iso:' : ':';
+         addLiteral(node.id, `${prefix}${k}`, v, 'xsd:string', k);
+      }
+    });
+  });
+
+  // 2. Process Edges -> in RDF, edges CANNOT hold properties!
+  edges.forEach((edge, idx) => {
+    const eProps = edge.properties || {};
+    const vf = eProps.validFrom;
+    const vt = eProps.validTo;
+    
+    // In BFO, structural relations with time bounds require W3C Reification (rdf:Statement)
+    const requiresReification = !isIso15926 && 
+                                (edge.label === 'mounted_in' || edge.label === 'stored_at' || edge.label === 'has_slot');
+
+    if (requiresReification) {
+      const stmtId = `stmt_${edge.id || idx}_${edge.from}_${edge.to}`;
+      rdfNodes.push({
+        id: stmtId,
+        label: `_:${edge.label}_${edge.from}_${vf ?? 0}`,
+        type: 'Statement', // Renders as yellow hexagon
+        properties: { isCurrent: eProps.isCurrent !== false }
+      });
+
+      // W3C Standard Reification Quads
+      rdfEdges.push(
+        {
+          id: `rdf_subj_${stmtId}`,
+          from: stmtId,
+          to: edge.from,
+          label: 'rdf:subject',
+          type: 'predicate',
+          properties: { isCurrent: eProps.isCurrent !== false }
+        },
+        {
+          id: `rdf_obj_${stmtId}`,
+          from: stmtId,
+          to: edge.to,
+          label: 'rdf:object',
+          type: 'predicate',
+          properties: { isCurrent: eProps.isCurrent !== false }
+        }
+      );
+
+      // Attach temporal bounds to the reified statement node
+      if (vf !== undefined) addLiteral(stmtId, ':validFrom', vf, 'xsd:integer', 'vf');
+      if (vt !== undefined && vt !== null) addLiteral(stmtId, ':validTo', vt, 'xsd:integer', 'vt');
+    } else {
+      // Direct binary triple (e.g. temporalPartOf, inheres_in, has_defect) — strictly NO edge properties!
+      rdfEdges.push({
+        id: edge.id || `rdf_direct_${idx}`,
+        from: edge.from,
+        to: edge.to,
+        label: edge.label,
+        type: edge.type,
+        properties: { isCurrent: eProps.isCurrent !== false }
+      });
+    }
+  });
+
+  return { nodes: rdfNodes, edges: rdfEdges };
 }

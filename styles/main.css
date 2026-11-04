@@ -1183,3 +1183,41 @@ pre.query-code-block {
   border-top: 2.5px dashed #8b5cf6;
   flex-shrink: 0;
 }
+
+.swatch-box-state-past {
+  width: 14px;
+  height: 14px;
+  background: #94a3b8;
+  border: 1.5px dashed #64748b;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* --- Accurate Legend Swatch Shapes matching Mermaid & Vis --- */
+.swatch-pill-quality {
+  width: 16px;
+  height: 11px;
+  background: #f59e0b;
+  border: 1.5px solid #b45309;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.swatch-hex-statement {
+  width: 16px;
+  height: 12px;
+  background: #fbbf24;
+  border: 1.5px dashed #78350f;
+  clip-path: polygon(22% 0%, 78% 0%, 100% 50%, 78% 100%, 22% 100%, 0% 50%);
+  flex-shrink: 0;
+}
+
+.swatch-diamond-defect {
+  width: 16px;
+  height: 12px;
+  background: #ef4444;
+  border: 1.5px solid #991b1b;
+  clip-path: polygon(22% 0%, 78% 0%, 100% 50%, 78% 100%, 22% 100%, 0% 50%);
+  transform: none;
+  flex-shrink: 0;
+}

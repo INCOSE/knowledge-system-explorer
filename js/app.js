@@ -135,9 +135,9 @@ const App = {
     const availableNodes = computed(() => baseNodes.value.map(n => n.id));
     const activeParts = computed(() => baseNodes.value.filter(n => n.entityClass !== 'Slot' && n.entityClass !== 'Warehouse').map(n => n.id));
     const activeWarehouses = computed(() => baseNodes.value.filter(n => n.entityClass === 'Warehouse').map(n => n.id));
-    const bizInstallSources = computed(() => baseNodes.value.filter(n => n.entityClass === 'Part').map(n => n.id));
-    const bizInstallTargets = computed(() => baseNodes.value.filter(n => n.entityClass === 'Vehicle' || n.entityClass === 'Part' || n.entityClass === 'Slot').map(n => n.id));
-
+    const bizInstallSources = computed(() => baseNodes.value.filter(n => n.entityClass === 'Part' || n.entityClass === 'Vehicle').map(n => n.id));
+    const bizInstallTargets = computed(() => baseNodes.value.filter(n => n.entityClass === 'Vehicle' || n.entityClass === 'Part' || n.entityClass === 'Slot' || n.entityClass === 'Warehouse').map(n => n.id));
+    
     function dispatch(event) {
       if (!event) return;
       state.eventLog.push(event);
@@ -269,9 +269,9 @@ const App = {
         nodes.push({ id: 'bfoSys', label: dict.bfoSys, swatch: 'swatch-box-sys' });
         nodes.push({ id: 'bfoElem', label: dict.bfoElem, swatch: 'swatch-box-elem' });
         nodes.push({ id: 'bfoSlot', label: dict.bfoSlot || 'BFO:Site (Functional Slot)', swatch: 'swatch-box-slot' });
-        nodes.push({ id: 'bfoQuality', label: dict.bfoQuality, swatch: 'swatch-diamond' });
+        nodes.push({ id: 'bfoQuality', label: dict.bfoQuality, swatch: 'swatch-pill-quality' });
         if (state.perspective === 'SMS_RDF') {
-          nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-diamond' });
+          nodes.push({ id: 'rdfStmt', label: dict.rdfStmt, swatch: 'swatch-hex-statement' });
           nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
           edges.push({ id: 'rdfPred', label: dict.rdfPred, swatch: 'swatch-line-past' });
         } else {
@@ -282,6 +282,9 @@ const App = {
       } else {
         nodes.push({ id: 'iso4d', label: dict.iso4d, swatch: 'swatch-box-4d' });
         nodes.push({ id: 'isoState', label: dict.isoState, swatch: 'swatch-box-state' });
+        if (state.showHistory) {
+          nodes.push({ id: 'isoStatePast', label: dict.isoStatePast || 'Historical State Slice', swatch: 'swatch-box-state-past' });
+        }
         nodes.push({ id: 'isoDefect', label: dict.isoDefect, swatch: 'swatch-diamond-defect' });
         if (state.perspective === 'SMS_RDF') nodes.push({ id: 'rdfLit', label: dict.rdfLit, swatch: 'swatch-literal' });
         edges.push({ id: 'isoPart', label: dict.isoPartRel, swatch: 'swatch-line-active' });
