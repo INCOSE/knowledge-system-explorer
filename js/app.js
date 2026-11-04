@@ -248,7 +248,7 @@ const App = {
 
     const graphLegendItems = computed(() => {
       const nodes = []; const edges = []; const dict = t.value.legend;
-
+      
       if (state.perspective === 'SMRM' || state.ontology === 'NAIVE_NODE' || state.ontology === 'NAIVE_EDGE') {
         nodes.push({ id: 'naiveVehicle', label: dict.naiveVehicle, swatch: 'swatch-box-vehicle' });
         if (state.perspective !== 'SMRM') nodes.push({ id: 'naiveSlot', label: dict.naiveSlot, swatch: 'swatch-box-slot' });
@@ -290,7 +290,6 @@ const App = {
         if (state.perspective === 'SMS_LPG') edges.push({ id: 'isoTrans', label: dict.isoTransitionRel, swatch: 'swatch-line-transition' });
       }
 
-      // Dynamic Legend Additions for Distinct Inferred Knowledge & Wisdom Nodes
       const gNodes = activeGraph.value.nodes || [];
       const gEdges = activeGraph.value.edges || [];
 
@@ -366,6 +365,7 @@ const App = {
         resetVanishingCrackTimeline(0);
         setPerspective('SMIM');
         state.graphEngine = 'MERMAID';
+        audioDuration.value = vanishingCrackScenario.fallbackDuration || 148;
       }
     }
 
@@ -486,6 +486,7 @@ const App = {
 
       if (activeScenarioId.value === 'SANDBOX_TOUR') resetSandboxTourTimeline(0);
       else if (activeScenarioId.value === 'QDIKW_PIPELINE') resetQdikwTimeline(0);
+      else resetVanishingCrackTimeline(0);
 
       if (resetScenarioGraph) {
         resetActiveScenarioState();

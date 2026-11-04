@@ -1,8 +1,8 @@
 /**
  * VIS.JS RENDERER ADAPTER
  * -----------------------
- * Renders the Semantic Graph using vis-network with distinct visual styling
- * for Recorded Facts vs Inferred Knowledge (Stress, Hazards, Directives, Blind Spots).
+ * Renders the Semantic Graph using vis-network with distinct visual styling.
+ * Now explicitly displays temporal boundaries directly on edges.
  */
 
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
@@ -47,6 +47,25 @@ export function initVisNetwork(container) {
   network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
 }
 
+/**
+ * Helper to safely extract and format properties for the visual canvas.
+ * Allows temporal bounds (validFrom, validTo) to bypass the internal filter.
+ */
+function formatGraphProperties(props) {
+  if (!props) return '';
+  const allowed = Object.entries(props).filter(([k, v]) => {
+    if (v === undefined || v === null || k === 'isCurrent') return false;
+    return !INTERNAL_PROPERTY_KEYS.includes(k) || ['validFrom', 'validTo', 'atTime'].includes(k);
+  });
+  
+  if (allowed.length === 0) return '';
+  
+  return allowed.map(([k, v]) => {
+    const valStr = typeof v === 'number' && ['validFrom', 'validTo', 'atTime'].includes(k) ? `T${v}` : v;
+    return `${k}: ${valStr}`;
+  }).join(', ');
+}
+
 export function updateVisNetwork(semanticGraph, isComplex = false) {
   if (!network || !nodesDataSet || !edgesDataSet) return;
 
@@ -55,11 +74,8 @@ export function updateVisNetwork(semanticGraph, isComplex = false) {
     let labelText = node.label || node.id;
 
     if (node.properties) {
-      const customProps = Object.entries(node.properties).filter(
-        ([k, v]) => !INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null
-      );
-      if (customProps.length > 0) {
-        const propStr = customProps.map(([k, v]) => `${k}: ${v}`).join(', ');
+      const propStr = formatGraphProperties(node.properties);
+      if (propStr) {
         labelText += `\n{${propStr}}`;
       }
     }
@@ -88,12 +104,11 @@ export function updateVisNetwork(semanticGraph, isComplex = false) {
   const visEdges = (semanticGraph.edges || []).map((edge, idx) => {
     const style = getVisEdgeStyle(edge);
     let rawLabel = edge.label || '';
+    
     if (edge.properties) {
-      const customEdgeProps = Object.entries(edge.properties).filter(
-        ([k, v]) => !INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null
-      );
-      if (customEdgeProps.length > 0) {
-        const propStr = customEdgeProps.map(([k, v]) => `${k}: ${v}`).join(', ');
+      const propStr = formatGraphProperties(edge.properties);
+      if (propStr) {
+        // Standard newline for Vis.js
         rawLabel = `${rawLabel}\n{${propStr}}`;
       }
     }

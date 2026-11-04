@@ -3,6 +3,7 @@
  * ------------------------
  * Translates the abstract Semantic Graph into Mermaid flowchart syntax
  * with distinct shapes & colours for Recorded Facts vs Inferred Knowledge.
+ * Now explicitly formats and renders temporal properties directly on edges.
  */
 
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
@@ -73,6 +74,27 @@ async function executeRender(definition, container) {
   }
 }
 
+/**
+ * Helper to safely extract and format properties for the visual canvas.
+ * Allows temporal bounds (validFrom, validTo) to bypass the internal filter.
+ */
+function formatGraphProperties(props) {
+  if (!props) return '';
+  const allowed = Object.entries(props).filter(([k, v]) => {
+    if (v === undefined || v === null || k === 'isCurrent') return false;
+    // Allow validFrom, validTo, atTime even if they are in INTERNAL_PROPERTY_KEYS
+    return !INTERNAL_PROPERTY_KEYS.includes(k) || ['validFrom', 'validTo', 'atTime'].includes(k);
+  });
+  
+  if (allowed.length === 0) return '';
+  
+  return allowed.map(([k, v]) => {
+    // Prefix numeric timestamps with 'T' for clarity on the graph (e.g., T18)
+    const valStr = typeof v === 'number' && ['validFrom', 'validTo', 'atTime'].includes(k) ? `T${v}` : v;
+    return `${k}: ${valStr}`;
+  }).join(', ');
+}
+
 function buildMermaidDefinition(semanticGraph) {
   let def = `%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%\nflowchart TD\n`;
   def += '  classDef default fill:#f8fafc,stroke:#cbd5e1,color:#334155,stroke-width:1px\n';
@@ -90,7 +112,7 @@ function buildMermaidDefinition(semanticGraph) {
   def += '  classDef naivePart fill:#10b981,stroke:#059669,color:#ffffff,stroke-width:2px\n';
   def += '  classDef naiveDefect fill:#ef4444,stroke:#b91c1c,color:#ffffff,stroke-width:2px\n';
   def += '  classDef naiveWarehouse fill:#f97316,stroke:#ea580c,color:#ffffff,stroke-width:2px\n';
-  // Distinct Inferred Knowledge & Wisdom Styles
+  
   def += '  classDef infStress fill:#7c3aed,stroke:#5b21b6,color:#ffffff,stroke-width:2px,stroke-dasharray:5 2\n';
   def += '  classDef infHazard fill:#be123c,stroke:#881337,color:#ffffff,stroke-width:2.5px,stroke-dasharray:6 2\n';
   def += '  classDef wisdomDir fill:#059669,stroke:#065f46,color:#ffffff,stroke-width:3px\n';
@@ -102,11 +124,8 @@ function buildMermaidDefinition(semanticGraph) {
     let labelText = node.label || node.id;
 
     if (node.properties) {
-      const customProps = Object.entries(node.properties).filter(
-        ([k, v]) => !INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null
-      );
-      if (customProps.length > 0) {
-        const propStr = customProps.map(([k, v]) => `${k}: ${v}`).join(', ');
+      const propStr = formatGraphProperties(node.properties);
+      if (propStr) {
         labelText = `${labelText} {${propStr}}`;
       }
     }
@@ -122,32 +141,25 @@ function buildMermaidDefinition(semanticGraph) {
       entityType = 'BFO:Site (Slot)';
     }
 
-    // Distinct Mermaid geometry per ontological / inference role
     let shapeOpen = '["';
     let shapeClose = '"]';
 
     if (entityType === 'InferredStress') {
-      // Subroutine shape [[...]] for inferred stress state
       shapeOpen = '[["🧠 ';
       shapeClose = '"]]';
     } else if (entityType === 'InferredHazard') {
-      // Hexagon shape {{...}} for inferred fracture / hazard
       shapeOpen = '{{"⚡ ';
       shapeClose = '"}}';
     } else if (entityType === 'WisdomDirective') {
-      // Trapezoid [/...\] for actionable wisdom directive
       shapeOpen = '[/"✅ ';
       shapeClose = '"\\]';
     } else if (entityType === 'BlindSpot') {
-      // Parallelogram [/.../] for unmapped blind spot warning
       shapeOpen = '[/"⚠️ ';
       shapeClose = '"/]';
     } else if (entityType === 'TemporalPartMembership' || entityType === 'RelationalQuality' || entityType === 'Defect' || /^def/i.test(node.id)) {
-      // Recorded Defect
       shapeOpen = '{{"🔧 ';
       shapeClose = '"}}';
     } else if (entityType === 'Literal' || entityType === 'Quality' || entityType === 'DependentContinuant' || /^qual/i.test(node.id)) {
-      // Recorded BFO Quality
       shapeOpen = '(["🔍 ';
       shapeClose = '"])';
     }
@@ -172,11 +184,9 @@ function buildMermaidDefinition(semanticGraph) {
 
     let rawLabel = edge.label || '';
     if (edge.properties) {
-      const customEdgeProps = Object.entries(edge.properties).filter(
-        ([k, v]) => !INTERNAL_PROPERTY_KEYS.includes(k) && v !== undefined && v !== null
-      );
-      if (customEdgeProps.length > 0) {
-        const propStr = customEdgeProps.map(([k, v]) => `${k}: ${v}`).join(', ');
+      const propStr = formatGraphProperties(edge.properties);
+      if (propStr) {
+        // Escaped newline for Mermaid edge syntax
         rawLabel = `${rawLabel}\\n{${propStr}}`;
       }
     }
