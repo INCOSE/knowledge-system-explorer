@@ -96,6 +96,8 @@ The **Knowledge Architecture Workbench** allows systems engineers and ontologist
     ├── main.css                             # Application styling & layout
     └── Twemoji-16.0.1.ttf                   # Standalone typography & emoji support
 
+```
+
 ## Local Development
 
 Because this project runs purely as a buildless static web application, no installation or compilation is required.
@@ -108,3 +110,5 @@ python -m http.server 8000
 
 # Or using Node.js npx
 npx http-server . -p 8000
+
+```
