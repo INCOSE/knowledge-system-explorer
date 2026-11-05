@@ -1317,3 +1317,53 @@ pre.query-code-block {
   color: #ffffff;
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
 }
+
+/* --- Академическая атрибуция на главной странице --- */
+.inspiration-block {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #cbd5e1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0; /* Гарантирует, что блок не сплющится при длинном списке сценариев */
+}
+
+.inspiration-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.05em;
+}
+
+.inspiration-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0284c7;
+  text-decoration: none;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.inspiration-title:hover {
+  color: #0369a1;
+  text-decoration: underline;
+}
+
+.inspiration-meta {
+  font-size: 11px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.inspiration-divider {
+  color: #cbd5e1;
+  font-size: 10px;
+}

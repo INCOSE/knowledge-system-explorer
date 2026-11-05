@@ -893,7 +893,21 @@ const App = {
           </div>
         </div>
         
-        <div class="landing-footer" style="margin-top: 28px; text-align: center; color: #64748b; font-size: 13px; line-height: 1.6;">
+        <!-- Блок "Inspired by" -->
+        <div class="inspiration-block">
+          <div class="inspiration-label">Inspired by INCOSE EMEASEC 2026</div>
+          <a href="https://www.researchgate.net/publication/417370232_The_Knowledge_System_-_Is_it_one_ring_to_rule_them_all" target="_blank" rel="noopener noreferrer" class="inspiration-title">
+            The Knowledge System - Is it one ring to rule them all?
+          </a>
+          <div class="inspiration-meta">
+            <span>Robert Nilsson (Volvo Cars Corporation)</span>
+            <span class="inspiration-divider">•</span>
+            <span>DOI: 10.65351/emeasec26.013</span>
+          </div>
+        </div>
+        
+        <!-- Ваша существующая атрибуция (отступ сверху уменьшен с 28px до 16px для баланса) -->
+        <div class="landing-footer" style="margin-top: 16px; text-align: center; color: #64748b; font-size: 13px; line-height: 1.6;">
           Developed by <a href="https://efremov-systems.com" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none; font-weight: 600;">Alexander Efremov</a>.<br/>
           This tool is in active development. Feedback and suggestions are welcome via 
           <a href="https://github.com/INCOSE/knowledge-system-explorer/issues" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none;">GitHub Issues</a>.<br/>
