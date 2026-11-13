@@ -800,6 +800,9 @@ const App = {
       reader.readAsText(file);
     }
 
+    // Graph Legend collapse state
+    const isLegendCollapsed = ref(false);
+
     return {
       state, t, layout, advanceTime, setPerspective, dispatch, semanticGraph,
       fileInput, saveJson, triggerLoadJson, onFileLoaded, renderGraph,
@@ -815,7 +818,7 @@ const App = {
       bizDeleteNodeId, handleBizDeleteNode,
       bizStorePart, bizStoreTarget, handleBizStore,
       bomTrees, lpgNodeRecords, lpgRecords, rdfTtl, formatProperties, queryCode, liveQueryResult,
-      visContainer, mermaidContainer, graphCaption, graphLegendItems,
+      visContainer, mermaidContainer, graphCaption, graphLegendItems, isLegendCollapsed,
       startResizeH, startResizeV, scenarioAudio, isPlaying, audioCurrentTime, audioDuration,
       showSubtitles, currentSubtitleText, playAudio, pauseAudio, togglePlayAudio, stopAudio,
       onTimeUpdate, onLoadedMetadata, onAudioEnded, onSeek, formatTime
@@ -831,7 +834,7 @@ const App = {
         <p class="menu-subtitle">{{ t.menuSubtitle }}</p>
 
         <div class="menu-actions">
-          <div class="menu-action-row">
+          <div class="menu-action-row menu-action-row-hero">
             <button class="menu-btn menu-btn-primary" @click="openSandbox">
               <span class="btn-main-text">{{ t.menuSandboxTitle }}</span>
               <span class="btn-sub-text">{{ t.menuSandboxSub }}</span>
@@ -918,107 +921,134 @@ const App = {
     <!-- Main Sandbox & Scenario Workspace -->
     <div v-if="state.currentView !== 'MENU'" class="sandbox-workspace">
       <div class="control-deck">
-
-        <!-- Generic Scenario Chapters Bar (Used by Four Quadrants & multi-chapter narratives) -->
-        <div v-if="state.currentView === 'SCENARIO' && activeChapters.length > 0" class="scenario-chapters-bar">
-          <span class="scenario-chapters-title">📑 Chapters:</span>
-          <button v-for="ch in activeChapters" :key="ch.id" class="chapter-pill" :class="{ active: currentChapterId === ch.id }" @click="jumpToTime(ch.time)" :title="'Jump to ' + ch.label + ' (' + formatTime(ch.time) + ')'">
-            {{ ch.label }} <small style="opacity:0.75;">({{ formatTime(ch.time) }})</small>
-          </button>
-        </div>
-
-        <!-- QDIKW Stage & Role Banner -->
-        <div id="qdikw-stage-bar" v-if="state.qdikw?.active" class="qdikw-banner">
-          <div class="qdikw-steps">
-            <span id="qdikw-step-Q" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'Q' || state.qdikw.stage === 'INTRO'}" @click="jumpToQdikwStage('Q')">{{ t.qdikwStepQ }}</span>
-            <span id="qdikw-step-D" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'D'}" @click="jumpToQdikwStage('D')">{{ t.qdikwStepD }}</span>
-            <span id="qdikw-step-I" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'I'}" @click="jumpToQdikwStage('I')">{{ t.qdikwStepI }}</span>
-            <span id="qdikw-step-K" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'K'}" @click="jumpToQdikwStage('K')">{{ t.qdikwStepK }}</span>
-            <span id="qdikw-step-W" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'W'}" @click="jumpToQdikwStage('W')">{{ t.qdikwStepW }}</span>
-          </div>
-          <div class="qdikw-role-box" v-if="state.qdikw.activeRole">
-            <span class="qdikw-role-name">{{ state.qdikw.activeRole }}</span>
-            <span class="qdikw-role-desc">{{ state.qdikw.roleBadge }}</span>
-          </div>
-        </div>
-
-        <!-- Semantic Rules Toolbar -->
-        <div id="qdikw-rules-bar" v-if="state.qdikw?.active" class="smrm-rules-row">
-          <span style="color:#4c1d95; font-weight:700; margin-right: 8px;">{{ t.smrmRulesLabel }}</span>
-          <label id="qdikw-rule-1" class="rule-chip" :class="{active: state.qdikw.rules.rule1}">
-            <input type="checkbox" v-model="state.qdikw.rules.rule1" @change="renderGraph" style="display:none;">
-            {{ t.rule1Label }}
-          </label>
-          <label id="qdikw-rule-2" class="rule-chip" :class="{active: state.qdikw.rules.rule2}">
-            <input type="checkbox" v-model="state.qdikw.rules.rule2" @change="renderGraph" style="display:none;">
-            {{ t.rule2Label }}
-          </label>
-          <label id="qdikw-rule-3" class="rule-chip" :class="{active: state.qdikw.rules.rule3}">
-            <input type="checkbox" v-model="state.qdikw.rules.rule3" @change="renderGraph" style="display:none;">
-            {{ t.rule3Label }}
-          </label>
-
-          <div id="qdikw-slot-config" style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-            <span style="font-weight: 600;">{{ t.slotRegimeLabel }}</span>
-            <button class="rule-chip" :class="{active: state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime === 'DYNAMIC_CYCLIC'}" @click="toggleSlotRegime">
-              {{ state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime || t.slotNoLoad }}
+        <!-- ZONE A: ARCHITECTURAL LENS (Dark Slate Theme) -->
+        <div class="deck-zone-lens">
+          <!-- Generic Scenario Chapters Bar (Used by Four Quadrants & multi-chapter narratives) -->
+          <div v-if="state.currentView === 'SCENARIO' && activeChapters.length > 0" class="scenario-chapters-bar">
+            <span class="scenario-chapters-title">📑 Chapters:</span>
+            <button v-for="ch in activeChapters" :key="ch.id" class="chapter-pill" :class="{ active: currentChapterId === ch.id }" @click="jumpToTime(ch.time)" :title="'Jump to ' + ch.label + ' (' + formatTime(ch.time) + ')'">
+              {{ ch.label }} <small style="opacity:0.75;">({{ formatTime(ch.time) }})</small>
             </button>
           </div>
+
+          <!-- QDIKW Stage & Role Banner -->
+          <div id="qdikw-stage-bar" v-if="state.qdikw?.active" class="qdikw-banner">
+            <div class="qdikw-steps">
+              <span id="qdikw-step-Q" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'Q' || state.qdikw.stage === 'INTRO'}" @click="jumpToQdikwStage('Q')">{{ t.qdikwStepQ }}</span>
+              <span id="qdikw-step-D" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'D'}" @click="jumpToQdikwStage('D')">{{ t.qdikwStepD }}</span>
+              <span id="qdikw-step-I" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'I'}" @click="jumpToQdikwStage('I')">{{ t.qdikwStepI }}</span>
+              <span id="qdikw-step-K" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'K'}" @click="jumpToQdikwStage('K')">{{ t.qdikwStepK }}</span>
+              <span id="qdikw-step-W" class="qdikw-step-pill" :class="{active: state.qdikw.stage === 'W'}" @click="jumpToQdikwStage('W')">{{ t.qdikwStepW }}</span>
+            </div>
+            <div class="qdikw-role-box" v-if="state.qdikw.activeRole">
+              <span class="qdikw-role-name">{{ state.qdikw.activeRole }}</span>
+              <span class="qdikw-role-desc">{{ state.qdikw.roleBadge }}</span>
+            </div>
+          </div>
+
+          <!-- Semantic Rules Toolbar -->
+          <div id="qdikw-rules-bar" v-if="state.qdikw?.active" class="smrm-rules-row">
+            <span style="color:#c4b5fd; font-weight:700; margin-right: 8px;">{{ t.smrmRulesLabel }}</span>
+            <label id="qdikw-rule-1" class="rule-chip" :class="{active: state.qdikw.rules.rule1}">
+              <input type="checkbox" v-model="state.qdikw.rules.rule1" @change="renderGraph" style="display:none;">
+              {{ t.rule1Label }}
+            </label>
+            <label id="qdikw-rule-2" class="rule-chip" :class="{active: state.qdikw.rules.rule2}">
+              <input type="checkbox" v-model="state.qdikw.rules.rule2" @change="renderGraph" style="display:none;">
+              {{ t.rule2Label }}
+            </label>
+            <label id="qdikw-rule-3" class="rule-chip" :class="{active: state.qdikw.rules.rule3}">
+              <input type="checkbox" v-model="state.qdikw.rules.rule3" @change="renderGraph" style="display:none;">
+              {{ t.rule3Label }}
+            </label>
+
+            <div id="qdikw-slot-config" style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+              <span style="font-weight: 600; color: #cbd5e1;">{{ t.slotRegimeLabel }}</span>
+              <button class="rule-chip" :class="{active: state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime === 'DYNAMIC_CYCLIC'}" @click="toggleSlotRegime">
+                {{ state.qdikw.slotMetadata?.SLOT_FRONT_SUSPENSION?.loadRegime || t.slotNoLoad }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Top Row: Compact Home, Badge, Ontologies, Perspectives, Engine, Save/Load, Language -->
+          <div class="deck-row deck-row-lens">
+            <button class="lens-home-btn" @click="goHome" title="Return to Main Menu">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              <span>Home</span>
+            </button>
+
+            <span class="arch-lens-badge">🔬 ARCHITECTURAL LENS</span>
+            <div class="divider dark-divider"></div>
+
+            <!-- Lens Control Group: Ontology -->
+            <div class="lens-control-group">
+              <div class="section-label lens-label">
+                <span class="tooltip-trigger">
+                  {{ t.ontoTitle }}
+                  <span class="hover-tooltip" v-html="t.tooltips.smim"></span>
+                </span>
+              </div>
+              <div class="btn-group lens-btn-group">
+                <button id="ctrl-onto-bfo" :class="{ active: state.ontology === 'BFO' }" @click="state.ontology = 'BFO'">BFO (3D)</button>
+                <button id="ctrl-onto-iso" :class="{ active: state.ontology === 'ISO15926' }" @click="state.ontology = 'ISO15926'">ISO 15926 (4D)</button>
+                <button id="ctrl-onto-naive-node" :class="{ active: state.ontology === 'NAIVE_NODE' }" @click="state.ontology = 'NAIVE_NODE'">{{ t.ontoNaiveNode }}</button>
+                <button id="ctrl-onto-naive-edge" :class="{ active: state.ontology === 'NAIVE_EDGE' }" @click="state.ontology = 'NAIVE_EDGE'">{{ t.ontoNaiveEdge }}</button>
+              </div>
+            </div>
+            <div class="divider dark-divider"></div>
+
+            <!-- Lens Control Group: Perspective -->
+            <div class="lens-control-group">
+              <div class="section-label lens-label">
+                <span>👁️</span>
+                <span class="tooltip-trigger" style="margin-left: 3px;">
+                  {{ t.viewTitle }}
+                  <span class="hover-tooltip" v-html="t.tooltips.sms"></span>
+                </span>
+              </div>
+              <div class="btn-group lens-btn-group">
+                <button id="ctrl-view-smrm" :class="{ active: state.perspective === 'SMRM' }" @click="setPerspective('SMRM')">{{ t.viewSmrm }}</button>
+                <button id="ctrl-view-logical" :class="{ active: state.perspective === 'SMIM' }" @click="setPerspective('SMIM')">{{ t.viewLogical }}</button>
+                <button id="ctrl-view-physical-lpg" :class="{ active: state.perspective === 'SMS_LPG' }" @click="state.storage = 'LPG'; setPerspective('SMS_LPG')">{{ t.viewPhysicalLpg }}</button>
+                <button id="ctrl-view-physical-rdf" :class="{ active: state.perspective === 'SMS_RDF' }" @click="state.storage = 'RDF'; setPerspective('SMS_RDF')">{{ t.viewPhysicalRdf }}</button>
+              </div>
+            </div>
+            <div class="divider dark-divider"></div>
+
+            <!-- Lens Control Group: Engine & Files -->
+            <div class="lens-control-group">
+              <div class="section-label lens-label">🎨 <span>{{ t.engineTitle }}</span></div>
+              <div class="btn-group lens-btn-group">
+                <button id="ctrl-engine-vis" :class="{ active: state.graphEngine === 'VIS' }" @click="state.graphEngine = 'VIS'">🌐 Vis.js</button>
+                <button id="ctrl-engine-mermaid" :class="{ active: state.graphEngine === 'MERMAID' }" @click="state.graphEngine = 'MERMAID'">📊 Mermaid</button>
+              </div>
+              <div class="divider dark-divider" style="margin: 0 4px;"></div>
+              <button id="ctrl-save-json" class="lens-action-btn" @click="saveJson" :title="t.saveBtn">{{ t.saveBtn }}</button>
+              <button id="ctrl-load-json" class="lens-action-btn" @click="triggerLoadJson" :title="t.loadBtn">{{ t.loadBtn }}</button>
+              <input ref="fileInput" type="file" accept=".json" style="display: none;" @change="onFileLoaded" />
+            </div>
+
+            <div style="margin-left: auto;" class="btn-group flag-group lens-flag-group">
+              <button id="ctrl-lang-sv" :class="{ active: state.language === 'sv' }" @click="state.language = 'sv'" title="Svenska">🇸🇪</button>
+              <button id="ctrl-lang-en" :class="{ active: state.language === 'en' }" @click="state.language = 'en'" title="British English">🇬🇧</button>
+              <button id="ctrl-lang-ru" :class="{ active: state.language === 'ru' }" @click="state.language = 'ru'" title="Русский">🇷🇺</button>
+            </div>
+          </div>
         </div>
 
-        <div class="deck-row deck-row-top">
-          <div class="section-label">
-            <span class="iec-badge">IEC 63339 / SMIM<span class="iec-tooltip" v-html="t.tooltips.smim"></span></span>
-            <span>{{ t.ontoTitle }}</span>
-          </div>
-          <div class="btn-group">
-            <button id="ctrl-onto-bfo" :class="{ active: state.ontology === 'BFO' }" @click="state.ontology = 'BFO'">BFO (3D)</button>
-            <button id="ctrl-onto-iso" :class="{ active: state.ontology === 'ISO15926' }" @click="state.ontology = 'ISO15926'">ISO 15926 (4D)</button>
-            <button id="ctrl-onto-naive-node" :class="{ active: state.ontology === 'NAIVE_NODE' }" @click="state.ontology = 'NAIVE_NODE'">{{ t.ontoNaiveNode }}</button>
-            <button id="ctrl-onto-naive-edge" :class="{ active: state.ontology === 'NAIVE_EDGE' }" @click="state.ontology = 'NAIVE_EDGE'">{{ t.ontoNaiveEdge }}</button>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="section-label">
-            <span class="iec-badge">IEC 63339<span class="iec-tooltip" v-html="t.tooltips.sms"></span></span>
-            <span>👁️ {{ t.viewTitle }}</span>
-          </div>
-          <div class="btn-group">
-            <button id="ctrl-view-smrm" :class="{ active: state.perspective === 'SMRM' }" @click="setPerspective('SMRM')">{{ t.viewSmrm }}</button>
-            <button id="ctrl-view-logical" :class="{ active: state.perspective === 'SMIM' }" @click="setPerspective('SMIM')">{{ t.viewLogical }}</button>
-            <button id="ctrl-view-physical-lpg" :class="{ active: state.perspective === 'SMS_LPG' }" @click="state.storage = 'LPG'; setPerspective('SMS_LPG')">{{ t.viewPhysicalLpg }}</button>
-            <button id="ctrl-view-physical-rdf" :class="{ active: state.perspective === 'SMS_RDF' }" @click="state.storage = 'RDF'; setPerspective('SMS_RDF')">{{ t.viewPhysicalRdf }}</button>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="section-label">🎨 <span>{{ t.engineTitle }}</span></div>
-          <div class="btn-group">
-            <button id="ctrl-engine-vis" :class="{ active: state.graphEngine === 'VIS' }" @click="state.graphEngine = 'VIS'">🌐 Vis.js</button>
-            <button id="ctrl-engine-mermaid" :class="{ active: state.graphEngine === 'MERMAID' }" @click="state.graphEngine = 'MERMAID'">📊 Mermaid</button>
-          </div>
-
-          <div class="divider"></div>
-
-          <button id="ctrl-save-json" class="secondary" @click="saveJson" :title="t.saveBtn">{{ t.saveBtn }}</button>
-          <button id="ctrl-load-json" class="secondary" @click="triggerLoadJson" :title="t.loadBtn">{{ t.loadBtn }}</button>
-          <input ref="fileInput" type="file" accept=".json" style="display: none;" @change="onFileLoaded" />
-
-          <div style="margin-left: auto;" class="btn-group flag-group">
-            <button id="ctrl-lang-sv" :class="{ active: state.language === 'sv' }" @click="state.language = 'sv'" title="Svenska">🇸🇪</button>
-            <button id="ctrl-lang-en" :class="{ active: state.language === 'en' }" @click="state.language = 'en'" title="British English">🇬🇧</button>
-            <button id="ctrl-lang-ru" :class="{ active: state.language === 'ru' }" @click="state.language = 'ru'" title="Русский">🇷🇺</button>
-          </div>
-        </div>
-
-        <template v-if="state.userRole === 'UNI_ENGINEER'">
-          <div class="deck-row">
+        <!-- ZONE B: ENGINEER'S WORKSPACE (Light Theme with .action-pod flex cards) -->
+        <div v-if="state.userRole === 'UNI_ENGINEER'" class="deck-zone-engineer">
+          <!-- Pod 0: Time & Step [T=80 | Step+1] -->
+          <div class="action-pod action-pod-time">
             <span id="biz-time-badge" class="badge">T = {{ state.currentTime }}</span>
             <button id="biz-step-btn" @click="advanceTime">{{ t.stepBtn }}</button>
+            <label class="history-toggle-label">
+              <input type="checkbox" v-model="state.showHistory"> {{ t.history }}
+            </label>
+          </div>
 
-            <div class="divider"></div>
-
+          <!-- Pod 1: Register [1. Register] -->
+          <div class="action-pod">
             <label class="action-label">{{ t.actRegister }}</label>
             <select id="biz-reg-type" v-model="bizRegType" title="Entity Class">
               <option value="Vehicle">Vehicle</option>
@@ -1026,11 +1056,12 @@ const App = {
               <option value="Part">Part</option>
               <option value="Warehouse">Warehouse</option>
             </select>
-            <input id="biz-reg-id" type="text" v-model="bizRegId" placeholder="ID (e.g. Part_B)" style="width: 110px;" @keyup.enter="handleBizRegister">
+            <input id="biz-reg-id" type="text" v-model="bizRegId" placeholder="ID (e.g. Part_B)" style="width: 105px;" @keyup.enter="handleBizRegister">
             <button id="biz-reg-btn" class="secondary" @click="handleBizRegister">{{ t.actRegisterBtn }}</button>
+          </div>
 
-            <div class="divider"></div>
-
+          <!-- Pod 2: Install [2. Install] -->
+          <div class="action-pod">
             <label class="action-label">{{ t.actInstall }}</label>
             <select id="biz-inst-source" v-model="bizInstSource" title="Component to install">
               <option v-for="node in bizInstallSources" :key="'src_' + node" :value="node">{{ node }}</option>
@@ -1040,44 +1071,40 @@ const App = {
               <option v-for="node in bizInstallTargets" :key="'tgt_' + node" :value="node">{{ node }}</option>
             </select>
             <button id="biz-inst-btn" class="secondary" @click="handleBizInstall">{{ t.actInstallBtn }}</button>
-
-            <div class="divider"></div>
-
-            <label class="action-label">{{ t.actDismantle }}</label>
-            <select id="biz-dism-part" v-model="bizDismPart">
-              <option v-for="comp in installedComponents" :key="'comp_' + comp" :value="comp">{{ comp }}</option>
-            </select>
-            <button id="biz-dism-btn" class="danger" @click="handleBizDismantle">{{ t.actDismantleBtn }}</button>
-
-            <div class="divider"></div>
-
-            <label class="action-label">{{ t.actDelete }}</label>
-            <select id="biz-del-node" v-model="bizDeleteNodeId" title="Sandbox Reset: Delete entity">
-              <option v-for="node in availableNodes" :key="'del_' + node" :value="node">{{ node }}</option>
-            </select>
-            <button id="biz-del-btn" class="danger" @click="handleBizDeleteNode" title="Sandbox Reset: Delete selected entity">🗑️</button>
           </div>
 
-          <div class="deck-row" style="border-top: 1px solid #f1f5f9; background: #fafafa;">
+          <!-- Pod 3: Defect [3. Defect] -->
+          <div class="action-pod">
             <label class="action-label">{{ t.actDefect }}</label>
             <select id="biz-def-target" v-model="bizDefTarget">
               <option v-for="node in availableNodes" :key="'dn_' + node" :value="node">{{ node }}</option>
             </select>
-            <input id="biz-def-type" type="text" v-model="bizDefType" placeholder="Type (e.g. crack)" style="width: 110px;">
-            <input id="biz-def-val" type="text" v-model="bizDefVal" placeholder="Value (e.g. 15mm)" style="width: 85px;">
+            <input id="biz-def-type" type="text" v-model="bizDefType" placeholder="Type (e.g. crack)" style="width: 105px;">
+            <input id="biz-def-val" type="text" v-model="bizDefVal" placeholder="Value (e.g. 15mm)" style="width: 80px;">
             <button id="biz-def-btn" class="secondary" @click="handleBizReportDefect">{{ t.actDefectBtn }}</button>
+          </div>
 
-            <div class="divider"></div>
-
+          <!-- Pod 4: Revoke [4. Revoke] -->
+          <div class="action-pod">
             <label class="action-label">{{ t.actRevoke }}</label>
             <select id="biz-rev-defect" v-model="bizRevDefect">
               <option v-for="d in activeDefectsList" :key="d.id" :value="d.id">{{ d.label }}</option>
             </select>
             <button id="biz-rev-btn" class="secondary" @click="handleBizRevokeDefect" title="Revoke defect (close in history)">{{ t.actRevokeBtn }}</button>
             <button id="biz-del-def-btn" class="danger" @click="handleBizDeleteDefect" title="Sandbox Reset: Delete defect completely">🗑️</button>
+          </div>
 
-            <div class="divider"></div>
+          <!-- Pod 5: Dismantle [5. Dismantle] -->
+          <div class="action-pod">
+            <label class="action-label">{{ t.actDismantle }}</label>
+            <select id="biz-dism-part" v-model="bizDismPart">
+              <option v-for="comp in installedComponents" :key="'comp_' + comp" :value="comp">{{ comp }}</option>
+            </select>
+            <button id="biz-dism-btn" class="danger" @click="handleBizDismantle">{{ t.actDismantleBtn }}</button>
+          </div>
 
+          <!-- Pod 6: Storage [6. Storage] -->
+          <div class="action-pod">
             <label class="action-label">{{ t.actStorage }}</label>
             <select id="biz-store-part" v-model="bizStorePart">
               <option v-for="part in activeParts" :key="'sp_' + part" :value="part">{{ part }}</option>
@@ -1087,14 +1114,17 @@ const App = {
               <option v-for="wh in activeWarehouses" :key="'sw_' + wh" :value="wh">{{ wh }}</option>
             </select>
             <button id="biz-store-btn" class="secondary" @click="handleBizStore">{{ t.actStorageBtn }}</button>
-
-            <div class="divider"></div>
-
-            <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
-              <input type="checkbox" v-model="state.showHistory"> {{ t.history }}
-            </label>
           </div>
-        </template>
+
+          <!-- Pod 7: Delete Entity [Delete Entity 🗑️] -->
+          <div class="action-pod action-pod-delete">
+            <label class="action-label" style="color: #dc2626;">{{ t.actDelete }}</label>
+            <select id="biz-del-node" v-model="bizDeleteNodeId" title="Sandbox Reset: Delete entity">
+              <option v-for="node in availableNodes" :key="'del_' + node" :value="node">{{ node }}</option>
+            </select>
+            <button id="biz-del-btn" class="danger" @click="handleBizDeleteNode" title="Sandbox Reset: Delete selected entity">🗑️</button>
+          </div>
+        </div>
       </div>
 
       <div class="main-container">
@@ -1107,22 +1137,28 @@ const App = {
             <span>{{ graphCaption }}</span>
           </div>
 
-          <div class="graph-legend">
-            <div class="legend-title">
+          <div class="graph-legend" :class="{ collapsed: isLegendCollapsed }">
+            <div class="legend-title" @click="isLegendCollapsed = !isLegendCollapsed" style="cursor: pointer;" :title="isLegendCollapsed ? 'Expand Legend' : 'Collapse Legend'">
               <span>{{ t.legend.title }}</span>
+              <button type="button" class="legend-toggle-btn" :title="isLegendCollapsed ? 'Expand Legend' : 'Collapse Legend'">
+                <span v-if="isLegendCollapsed">➕</span>
+                <span v-else>➖</span>
+              </button>
             </div>
-            <div v-if="graphLegendItems.nodes.length > 0" class="legend-section">
-              <div class="legend-section-title">{{ t.legend.nodes }}</div>
-              <div v-for="item in graphLegendItems.nodes" :key="item.id" class="legend-item">
-                <div :class="item.swatch"></div>
-                <span>{{ item.label }}</span>
+            <div v-show="!isLegendCollapsed">
+              <div v-if="graphLegendItems.nodes.length > 0" class="legend-section">
+                <div class="legend-section-title">{{ t.legend.nodes }}</div>
+                <div v-for="item in graphLegendItems.nodes" :key="item.id" class="legend-item">
+                  <div :class="item.swatch"></div>
+                  <span>{{ item.label }}</span>
+                </div>
               </div>
-            </div>
-            <div v-if="graphLegendItems.edges.length > 0" class="legend-section">
-              <div class="legend-section-title">{{ t.legend.edges }}</div>
-              <div v-for="item in graphLegendItems.edges" :key="item.id" class="legend-item">
-                <div :class="item.swatch"></div>
-                <span>{{ item.label }}</span>
+              <div v-if="graphLegendItems.edges.length > 0" class="legend-section">
+                <div class="legend-section-title">{{ t.legend.edges }}</div>
+                <div v-for="item in graphLegendItems.edges" :key="item.id" class="legend-item">
+                  <div :class="item.swatch"></div>
+                  <span>{{ item.label }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1133,8 +1169,10 @@ const App = {
         <div class="sidebar" style="flex: 1;">
           <div class="card" :style="{ flex: '0 0 ' + layout.bomHeight + '%' }">
             <h4>
-              <span>{{ t.titleBom }}</span>
-              <span class="iec-badge align-right">IEC 63339 / URMSM<span class="iec-tooltip" v-html="t.tooltips.urmsm"></span></span>
+              <span class="tooltip-trigger align-right">
+                {{ t.titleBom }}
+                <span class="hover-tooltip" v-html="t.tooltips.urmsm"></span>
+              </span>
             </h4>
             <div id="tree-container" class="card-scroll-body">
               <template v-if="bomTrees.length > 0">
@@ -1265,9 +1303,7 @@ const App = {
         </div>
       </div>
 
-      <audio ref="scenarioAudio" :src="activeAudioSrc" preload="metadata" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata" @play="isPlaying = true" @pause="isPlaying = false" @ended="onAudioEnded"></audio>
-      <div v-if="state.currentView === 'SCENARIO' && showSubtitles && currentSubtitleText" class="scenario-subtitles">{{ currentSubtitleText }}</div>
-
+      <!-- Docked Scenario Player Panel at the very bottom of .sandbox-workspace -->
       <div v-if="state.currentView === 'SCENARIO'" class="scenario-player-panel">
         <button class="player-btn" @click="togglePlayAudio" :title="isPlaying ? 'Pause' : 'Play'"><span v-if="isPlaying">⏸</span><span v-else>▶</span></button>
         <button class="player-btn" @click="stopAudio(true)" title="Stop"><span>⏹</span></button>
@@ -1275,9 +1311,9 @@ const App = {
         <span class="player-time">{{ formatTime(audioCurrentTime) }} / {{ formatTime(audioDuration || activeScenarioObj.fallbackDuration) }}</span>
         <button class="player-btn player-btn-cc" :class="{ active: showSubtitles }" @click="showSubtitles = !showSubtitles">CC</button>
       </div>
-      <button v-if="state.currentView !== 'MENU'" class="floating-home-btn" @click="goHome" title="Return to Main Menu">
-        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-      </button>
+
+      <audio ref="scenarioAudio" :src="activeAudioSrc" preload="metadata" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata" @play="isPlaying = true" @pause="isPlaying = false" @ended="onAudioEnded"></audio>
+      <div v-if="state.currentView === 'SCENARIO' && showSubtitles && currentSubtitleText" class="scenario-subtitles">{{ currentSubtitleText }}</div>
     </div>
   `
 };

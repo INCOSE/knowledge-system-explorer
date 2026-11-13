@@ -89,9 +89,9 @@ export const i18n = {
     linkCopiedToast: 'Link copied!',
 
     tooltips: {
-      smim: '<strong>SMIM (Semantic Information Model):</strong> Formal top-level ontological commitment (3D continuants vs 4D extents).',
-      sms: '<strong>SMS (Semantic Model Storage):</strong> Physical database representation (LPG tables vs W3C RDF triples).',
-      urmsm: '<strong>URMSM / SMRM:</strong> Domain engineer reference model and hierarchical viewpoint.'
+      smim: '<strong>SMIM Layer (IEC 63339):</strong> Formal top-level ontological commitment (3D BFO vs 4D ISO 15926).',
+      sms: '<strong>IEC 63339 Perspectives:</strong><br/>• <strong>Engineer (SMRM):</strong> Domain view, abstracts away ontological complexity.<br/>• <strong>Logical (SMIM):</strong> Strict semantic topology (3D continuants or 4D states).<br/>• <strong>Physical (SMS):</strong> Raw database storage (LPG tables or W3C RDF triples).',
+      urmsm: '<strong>URMSM / SMRM Layers (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Viewpoints and business aspects (e.g., this hierarchical BOM tree for manufacturing).<br/>• <strong>SMRM (Reference Model):</strong> Canonical domain concepts (System, Part, Defect) abstracted from IT complexity.'
     },
 
     legend: {
@@ -217,9 +217,9 @@ export const i18n = {
     closeBtn: 'Закрыть',
 
     tooltips: {
-      smim: '<strong>SMIM (Semantic Information Model):</strong> Формальная онтологическая модель (3D-объекты BFO против 4D-состояний ISO 15926).',
-      sms: '<strong>SMS (Semantic Model Storage):</strong> Физическая организация таблиц LPG или триплетов W3C RDF.',
-      urmsm: '<strong>URMSM / SMRM:</strong> Инженерное представление предметной области и словарь понятий.'
+      smim: '<strong>Слой SMIM (IEC 63339):</strong> Формальная онтологическая модель (3D-объекты BFO против 4D-состояний ISO 15926).',
+      sms: '<strong>Перспективы IEC 63339:</strong><br/>• <strong>Инженерная (SMRM):</strong> Предметный вид, скрывающий сложность онтологий.<br/>• <strong>Логическая (SMIM):</strong> Строгая семантика (3D-объекты или 4D-состояния).<br/>• <strong>Физическая (SMS):</strong> Структура хранения в БД (таблицы LPG или триплеты W3C RDF).',
+      urmsm: '<strong>Слои URMSM / SMRM (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Точки зрения и бизнес-аспекты (например, данное дерево BOM для отдела производства).<br/>• <strong>SMRM (Reference Model):</strong> Базовые концепты предметной области (Система, Деталь), очищенные от ИТ-сложности БД.'
     },
 
     legend: {
@@ -342,9 +342,9 @@ export const i18n = {
     linkCopiedToast: 'Länk kopierad!',
 
     tooltips: {
-      smim: '<strong>SMIM:</strong> Formell ontologisk modell (3D BFO vs 4D ISO 15926).',
-      sms: '<strong>SMS:</strong> Fysisk databasrepresentation (LPG vs W3C RDF).',
-      urmsm: '<strong>URMSM / SMRM:</strong> Domäningenjörens referensmodell och vy.'
+      smim: '<strong>SMIM Lager (IEC 63339):</strong> Formell ontologisk modell (3D BFO vs 4D ISO 15926).',
+      sms: '<strong>IEC 63339 Perspektiv:</strong><br/>• <strong>Ingenjör (SMRM):</strong> Domänvy, döljer ontologisk komplexitet.<br/>• <strong>Logisk (SMIM):</strong> Strikt semantisk topologi (3D-objekt eller 4D-tillstånd).<br/>• <strong>Fysisk (SMS):</strong> Rå databaslagring (LPG-tabeller eller W3C RDF-tripplar).',
+      urmsm: '<strong>URMSM / SMRM Lager (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Vyer och affärsaspekter (t.ex. detta hierarkiska BOM-träd för tillverkning).<br/>• <strong>SMRM (Reference Model):</strong> Kanoniska domänkoncept (System, Komponent) rensade från IT-komplexitet.'
     },
 
     legend: {
