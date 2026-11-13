@@ -159,7 +159,16 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
 
         ensureContinuantNode(targetId);
 
-        const qualityId = `qual_${targetId}_${defectName}`;
+        const baseQualityId = `qual_${targetId}_${defectName}`;
+        let qualityId = baseQualityId;
+        const existingNode = nodeMap.get(baseQualityId);
+        if (existingNode && existingNode.properties?.validTo !== null) {
+          qualityId = `${baseQualityId}_t${timestamp}`;
+          let counter = 1;
+          while (nodeMap.has(qualityId) && nodeMap.get(qualityId).properties?.validTo !== null) {
+            qualityId = `${baseQualityId}_t${timestamp}_${counter++}`;
+          }
+        }
         const qualityLabel = `${capitalize(defectName)}: ${defectValue}`;
 
         nodeMap.set(qualityId, {
@@ -197,17 +206,42 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
       case 'REVOKE_DEFECT': {
         const { targetId, defectName } = event;
         const revokeTime = event.valid_from;
-        const qualityId = `qual_${targetId}_${defectName}`;
+
+        // Close the currently active Quality node matching targetId and defectName
+        let activeQualityNode = null;
+        for (const node of nodeMap.values()) {
+          if (
+            node.type === 'Quality' &&
+            node.properties?.bearerId === targetId &&
+            node.properties?.qualityType === defectName &&
+            node.properties?.validTo === null
+          ) {
+            activeQualityNode = node;
+            break;
+          }
+        }
+
+        if (!activeQualityNode) {
+          const baseNode = nodeMap.get(`qual_${targetId}_${defectName}`);
+          if (baseNode && baseNode.properties?.validTo === null) {
+            activeQualityNode = baseNode;
+          }
+        }
+
+        if (activeQualityNode && activeQualityNode.properties) {
+          activeQualityNode.properties.validTo = revokeTime;
+        }
+
+        const activeQualityId = activeQualityNode ? activeQualityNode.id : `qual_${targetId}_${defectName}`;
 
         const activeInherence = edges.find(
-          e => e.from === qualityId && e.to === targetId && e.label === 'inheres_in' && e.properties.validTo === null
+          e => (e.from === activeQualityId || e.from.startsWith(`qual_${targetId}_${defectName}`)) &&
+               e.to === targetId &&
+               e.label === 'inheres_in' &&
+               e.properties.validTo === null
         );
         if (activeInherence) {
           activeInherence.properties.validTo = revokeTime;
-        }
-        const qNode = nodeMap.get(qualityId);
-        if (qNode && qNode.properties) {
-          qNode.properties.validTo = revokeTime;
         }
         break;
       }

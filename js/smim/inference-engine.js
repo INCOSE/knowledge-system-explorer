@@ -7,8 +7,11 @@
  * visually separate database facts from inferred knowledge.
  */
 
-export function applyQdikwInference(graph, state) {
-  if (!state.qdikw || !state.qdikw.active) {
+import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
+
+export function applyQdikwInference(graph, qdikwConfig) {
+  const qdikw = qdikwConfig?.qdikw || qdikwConfig || {};
+  if (!qdikw.active) {
     graph.wisdomAlerts = [];
     graph.blindSpots = [];
     return graph;
@@ -20,17 +23,24 @@ export function applyQdikwInference(graph, state) {
   const blindSpots = [];
 
   // 1. Decorate Slot nodes with Systems Architect metadata
-  const slotMetaMap = state.qdikw.slotMetadata || {};
-  (graph.nodes || []).forEach(node => {
-    const isTargetSlot =
-      slotMetaMap[node.id] ||
-      (node.id.startsWith('Slot_') && node.id.includes('ARM_SN_404') && slotMetaMap['SLOT_FRONT_SUSPENSION']);
+  const slotMetaMap = qdikw.slotMetadata || {};
+  const defaultSlotMeta = slotMetaMap['SLOT_FRONT_SUSPENSION'];
 
-    if (isTargetSlot) {
-      const meta = slotMetaMap[node.id] || slotMetaMap['SLOT_FRONT_SUSPENSION'];
+  (graph.nodes || []).forEach(node => {
+    const isSlot =
+      node.type === 'Slot' ||
+      node.properties?.entityClass === 'Slot' ||
+      (typeof node.id === 'string' && (node.id.startsWith('Slot_') || node.id.startsWith('st_Slot_')));
+
+    const specificMeta = slotMetaMap[node.id] || (node.properties?.ownerId && slotMetaMap[node.properties.ownerId]);
+    if (specificMeta) {
       node.properties = node.properties || {};
-      node.properties.loadRegime = meta.loadRegime;
-      node.properties.safetyFunction = meta.safetyFunction;
+      if (specificMeta.loadRegime !== undefined) node.properties.loadRegime = specificMeta.loadRegime;
+      if (specificMeta.safetyFunction !== undefined) node.properties.safetyFunction = specificMeta.safetyFunction;
+    } else if (isSlot && defaultSlotMeta) {
+      node.properties = node.properties || {};
+      if (defaultSlotMeta.loadRegime !== undefined) node.properties.loadRegime = defaultSlotMeta.loadRegime;
+      if (defaultSlotMeta.safetyFunction !== undefined) node.properties.safetyFunction = defaultSlotMeta.safetyFunction;
     }
   });
 
@@ -38,28 +48,105 @@ export function applyQdikwInference(graph, state) {
   const mountedPartToSlot = {};
   (graph.edges || []).forEach(e => {
     if (e.properties?.isCurrent === false) return;
-    if (e.label === 'mounted_in' || e.label === 'has_part') {
-      if (e.from.startsWith('Slot_')) mountedPartToSlot[e.to] = e.from;
-      if (e.to.startsWith('Slot_')) mountedPartToSlot[e.from] = e.to;
-    }
-  });
+    if (e.label === 'mounted_in' || e.label === 'has_part' || e.type === 'mounted_in' || e.type === 'composition') {
+      const fromIsSlot = typeof e.from === 'string' && (e.from.startsWith('Slot_') || e.from.startsWith('st_Slot_'));
+      const toIsSlot = typeof e.to === 'string' && (e.to.startsWith('Slot_') || e.to.startsWith('st_Slot_'));
 
-  // 3. Collect active defects at state.currentTime
-  const activeDefects = {};
-  state.eventLog.forEach(ev => {
-    if (ev.valid_from !== undefined && ev.valid_from > state.currentTime) return;
-    if (ev.type === 'REPORT_DEFECT') {
-      if (ev.valid_to !== null && ev.valid_to !== undefined && ev.valid_to <= state.currentTime) return;
-      if (!activeDefects[ev.targetId]) activeDefects[ev.targetId] = [];
-      activeDefects[ev.targetId].push({ name: ev.defectName, val: ev.defectValue });
-    } else if (ev.type === 'REVOKE_DEFECT') {
-      if (activeDefects[ev.targetId]) {
-        activeDefects[ev.targetId] = activeDefects[ev.targetId].filter(d => d.name !== ev.defectName);
+      if (fromIsSlot) {
+        const partId = e.childId || (e.to.startsWith('st_') ? (graph.nodes.find(n => n.id === e.to)?.properties?.ownerId || e.to) : e.to);
+        mountedPartToSlot[partId] = e.parentId || e.from;
+      }
+      if (toIsSlot) {
+        const partId = e.childId || (e.from.startsWith('st_') ? (graph.nodes.find(n => n.id === e.from)?.properties?.ownerId || e.from) : e.from);
+        mountedPartToSlot[partId] = e.parentId || e.to;
+      }
+      if (e.childId && e.parentId && (e.parentId.startsWith('Slot_') || e.label === 'mounted_in')) {
+        mountedPartToSlot[e.childId] = e.parentId;
       }
     }
   });
 
+  // 3. Discover active defects directly from graph.nodes and graph.edges (without scanning eventLog)
+  const activeDefects = {};
+  const recordDefect = (targetId, name, val) => {
+    if (!targetId || !name) return;
+    if (!activeDefects[targetId]) activeDefects[targetId] = [];
+    if (!activeDefects[targetId].some(d => d.name === name)) {
+      activeDefects[targetId].push({ name, val: val !== undefined && val !== null ? val : 'present' });
+    }
+  };
+
+  // 3a. Active Quality / Defect nodes connected via active inheres_in or has_defect edges
+  (graph.edges || []).forEach(e => {
+    if (e.properties?.isCurrent === false) return;
+
+    if (e.label === 'inheres_in' || e.type === 'inherence') {
+      const fromNode = (graph.nodes || []).find(n => n.id === e.from);
+      const toNode = (graph.nodes || []).find(n => n.id === e.to);
+
+      if (fromNode && (fromNode.type === 'Quality' || fromNode.type === 'Defect') && fromNode.properties?.isCurrent !== false) {
+        const targetId = toNode?.properties?.ownerId || fromNode.properties?.bearerId || fromNode.properties?.targetId || e.to;
+        const name = fromNode.properties?.qualityType || fromNode.properties?.defectType || fromNode.label;
+        const val = fromNode.properties?.value;
+        recordDefect(targetId, name, val);
+      } else if (toNode && (toNode.type === 'Quality' || toNode.type === 'Defect') && toNode.properties?.isCurrent !== false) {
+        const targetId = fromNode?.properties?.ownerId || toNode.properties?.bearerId || toNode.properties?.targetId || e.from;
+        const name = toNode.properties?.qualityType || toNode.properties?.defectType || toNode.label;
+        const val = toNode.properties?.value;
+        recordDefect(targetId, name, val);
+      }
+    } else if (e.label === 'has_defect' || e.type === 'has_defect') {
+      const fromNode = (graph.nodes || []).find(n => n.id === e.from);
+      const toNode = (graph.nodes || []).find(n => n.id === e.to);
+
+      if (toNode && (toNode.type === 'Defect' || toNode.type === 'Quality') && toNode.properties?.isCurrent !== false) {
+        const targetId = fromNode?.properties?.ownerId || toNode.properties?.targetId || toNode.properties?.bearerId || e.from;
+        const name = toNode.properties?.defectType || toNode.properties?.qualityType || toNode.label;
+        const val = toNode.properties?.value;
+        recordDefect(targetId, name, val);
+      } else if (fromNode && (fromNode.type === 'Defect' || fromNode.type === 'Quality') && fromNode.properties?.isCurrent !== false) {
+        const targetId = toNode?.properties?.ownerId || fromNode.properties?.targetId || fromNode.properties?.bearerId || e.to;
+        const name = fromNode.properties?.defectType || fromNode.properties?.qualityType || fromNode.label;
+        const val = fromNode.properties?.value;
+        recordDefect(targetId, name, val);
+      }
+    }
+
+    // 3b. NAIVE_EDGE: Custom properties on active mounted_in edges
+    if ((e.label === 'mounted_in' || e.type === 'mounted_in') && e.properties) {
+      const childId = e.childId || (typeof e.to === 'string' && e.to.startsWith('Slot_') ? e.from : e.to);
+      Object.entries(e.properties).forEach(([k, v]) => {
+        if (!INTERNAL_PROPERTY_KEYS.includes(k) &&
+            !['loadRegime', 'safetyFunction', 'rule', 'action', 'severity', 'status'].includes(k) &&
+            v !== undefined && v !== null) {
+          recordDefect(childId, k, v);
+        }
+      });
+    }
+  });
+
+  // 3c. NAIVE_NODE: Custom properties on active part nodes
+  (graph.nodes || []).forEach(node => {
+    if (node.properties?.isCurrent === false) return;
+    const isSpecial =
+      ['Quality', 'Defect', 'Slot', 'State', 'InferredStress', 'InferredHazard', 'WisdomDirective', 'BlindSpot'].includes(node.type) ||
+      node.properties?.entityClass === 'Slot' ||
+      node.properties?.entityClass === 'State' ||
+      (typeof node.id === 'string' && (node.id.startsWith('Slot_') || node.id.startsWith('st_')));
+
+    if (!isSpecial && node.properties) {
+      Object.entries(node.properties).forEach(([k, v]) => {
+        if (!INTERNAL_PROPERTY_KEYS.includes(k) &&
+            !['loadRegime', 'safetyFunction', 'rule', 'action', 'severity', 'status'].includes(k) &&
+            v !== undefined && v !== null) {
+          recordDefect(node.id, k, v);
+        }
+      });
+    }
+  });
+
   // 4. Evaluate SMRM Rules for mounted parts
+  const rules = qdikw.rules || {};
   Object.keys(activeDefects).forEach(partId => {
     const slotId = mountedPartToSlot[partId];
     const slotNode = graph.nodes.find(n => n.id === slotId);
@@ -73,7 +160,7 @@ export function applyQdikwInference(graph, state) {
       // RULE 1: Context Inheritance (Mounted in Dynamic_Cyclic Slot -> Active_Cyclic_Stress)
       let rule1Passed = false;
       const stressId = `Inf_Stress_${partId}`;
-      if (state.qdikw.rules.rule1 && loadRegime === 'DYNAMIC_CYCLIC') {
+      if (rules.rule1 && loadRegime === 'DYNAMIC_CYCLIC') {
         rule1Passed = true;
         newNodes.push({
           id: stressId,
@@ -104,7 +191,7 @@ export function applyQdikwInference(graph, state) {
       // RULE 2: Material Physics (Active_Cyclic_Stress + Crack > 10mm -> Rapid_Fracture_Propagation)
       let rule2Passed = false;
       const fracId = `Inf_Fracture_${partId}`;
-      if (state.qdikw.rules.rule2 && rule1Passed && defName === 'crack') {
+      if (rules.rule2 && rule1Passed && defName === 'crack') {
         const sizeMm = parseFloat(defect.val) || 0;
         if (sizeMm > 10) {
           rule2Passed = true;
@@ -127,7 +214,7 @@ export function applyQdikwInference(graph, state) {
 
       // RULE 3: Functional Safety (Rapid_Fracture + Steering_Control -> LOSS_OF_CONTROL)
       const hazardId = `Inf_Hazard_LOC`;
-      if (state.qdikw.rules.rule3 && rule2Passed && safetyFunc === 'STEERING_CONTROL') {
+      if (rules.rule3 && rule2Passed && safetyFunc === 'STEERING_CONTROL') {
         newNodes.push({
           id: hazardId,
           label: 'HAZARD: LOSS_OF_CONTROL',
@@ -148,7 +235,7 @@ export function applyQdikwInference(graph, state) {
         );
 
         // Stage W (Wisdom): Prescriptive Directive Node (Green Trapezoid)
-        if (state.qdikw.stage === 'W') {
+        if (qdikw.stage === 'W') {
           const wisdomNodeId = `Wisdom_Directive_Vehicle_1`;
           newNodes.push({
             id: wisdomNodeId,

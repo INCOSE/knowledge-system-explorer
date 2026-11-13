@@ -92,6 +92,7 @@ URMSM Viewpoint Generators                                 SMS Physical Storage 
 * `/js/urmsm/` (Unified Reference Model for Smart Manufacturing) - **User Viewpoints.**
   * `bom-view.js`: Hierarchical engineering Bill of Materials generator following strict `Parent -> Slot -> Child` traversal.
   * `smrm-view.js`: ISO 42010 Engineer View reduction engine collapsing intermediate contextual `Slot` nodes into direct transitive `has_part` relationships while preserving defect nodes.
+  * `query-intents.js`: Live temporal query engine evaluating placement and defect intents over SMRM projections.
 * `/js/scenarios/` - **Interactive Scenarios & Narratives.**
   * `scenario-sandbox-tour.js`: Onboarding scenario introducing UI controls, live domain actions, and multi-perspective exploration.
   * `scenario-four-quadrants.js`: Comprehensive 7-chapter narrative exploring the 2×2 matrix (BFO/15926 × LPG/RDF) with slide overlays.

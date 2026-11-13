@@ -317,7 +317,16 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
           });
         }
 
-        const defectNodeId = `def_${targetId}_${defectName}`;
+        const baseDefectId = `def_${targetId}_${defectName}`;
+        let defectNodeId = baseDefectId;
+        const existingDefNode = nodeMap.get(baseDefectId);
+        if (existingDefNode && existingDefNode.properties?.validTo !== null) {
+          defectNodeId = `${baseDefectId}_t${timestamp}`;
+          let counter = 1;
+          while (nodeMap.has(defectNodeId) && nodeMap.get(defectNodeId).properties?.validTo !== null) {
+            defectNodeId = `${baseDefectId}_t${timestamp}_${counter++}`;
+          }
+        }
         const defectLabel = `Defect: ${capitalize(defectName)} (${defectValue})`;
 
         nodeMap.set(defectNodeId, {
@@ -355,17 +364,43 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
       case 'REVOKE_DEFECT': {
         const { targetId, defectName } = event;
         const revokeTime = event.valid_from;
-        const defectNodeId = `def_${targetId}_${defectName}`;
+
+        // Close the currently active Defect node matching targetId and defectName
+        let activeDefectNode = null;
+        for (const node of nodeMap.values()) {
+          if (
+            node.type === 'Defect' &&
+            node.properties?.targetId === targetId &&
+            node.properties?.defectType === defectName &&
+            node.properties?.validTo === null
+          ) {
+            activeDefectNode = node;
+            break;
+          }
+        }
+
+        if (!activeDefectNode) {
+          const baseNode = nodeMap.get(`def_${targetId}_${defectName}`);
+          if (baseNode && baseNode.properties?.validTo === null) {
+            activeDefectNode = baseNode;
+          }
+        }
+
+        if (activeDefectNode && activeDefectNode.properties) {
+          activeDefectNode.properties.validTo = revokeTime;
+        }
+
+        const activeDefectId = activeDefectNode ? activeDefectNode.id : `def_${targetId}_${defectName}`;
 
         edges.forEach(e => {
-          if (e.to === defectNodeId && e.label === 'has_defect' && e.properties.validTo === null) {
+          if (
+            (e.to === activeDefectId || e.to.startsWith(`def_${targetId}_${defectName}`)) &&
+            e.label === 'has_defect' &&
+            e.properties.validTo === null
+          ) {
             e.properties.validTo = revokeTime;
           }
         });
-        const dNode = nodeMap.get(defectNodeId);
-        if (dNode && dNode.properties) {
-          dNode.properties.validTo = revokeTime;
-        }
         break;
       }
 

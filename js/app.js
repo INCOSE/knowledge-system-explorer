@@ -28,9 +28,9 @@ import { reduceGraphForSMRM } from './urmsm/smrm-view.js';
 import {
   generateLpgNodeStorage,
   generateLpgStorage,
-  generateLpgQuery,
-  evaluateLiveQuery
+  generateLpgQuery
 } from './sms/lpg-generator.js';
+import { evaluateLiveQuery } from './urmsm/query-intents.js';
 import { generateRdfStorage, generateRdfQuery } from './sms/rdf-generator.js';
 import { generatePhysicalGraph } from './sms/sms-graph-generator.js';
 import {
@@ -567,17 +567,6 @@ const App = {
           onAudioEnded();
         }
       }, 250);
-    }
-
-    function goHome() {
-      stopAudio(false);
-      updateUrlQueryParam(null);
-      state.currentView = 'MENU';
-      state.qdikw.active = false;
-      state.figureOverlay.visible = false;
-      state.eventLog.splice(0, state.eventLog.length);
-      state.currentTime = 0;
-      state.edgeSequence = 1;
     }
 
     function playAudio() {
