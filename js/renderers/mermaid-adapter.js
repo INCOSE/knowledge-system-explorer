@@ -111,7 +111,10 @@ function buildMermaidDefinition(semanticGraph) {
   def += '  classDef infStress fill:#7c3aed,stroke:#5b21b6,color:#ffffff,stroke-width:2px,stroke-dasharray:5 2\n';
   def += '  classDef infHazard fill:#be123c,stroke:#881337,color:#ffffff,stroke-width:2.5px,stroke-dasharray:6 2\n';
   def += '  classDef wisdomDir fill:#059669,stroke:#065f46,color:#ffffff,stroke-width:3px\n';
-  def += '  classDef blindSpot fill:#fef08a,stroke:#ca8a04,color:#713f12,stroke-width:2.5px,stroke-dasharray:4 2\n\n';
+  def += '  classDef blindSpot fill:#fef08a,stroke:#ca8a04,color:#713f12,stroke-width:2.5px,stroke-dasharray:4 2\n';
+  def += '  classDef metaURMSM fill:#06b6d4,stroke:#0e7490,color:#ffffff,stroke-width:2px\n';
+  def += '  classDef metaSMRM fill:#cbd5e1,stroke:#475569,color:#0f172a,stroke-width:2px\n';
+  def += '  classDef metaSMIM fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-width:2px\n\n';
 
   const nodes = semanticGraph.nodes || [];
   const edges = semanticGraph.edges || [];
@@ -169,7 +172,7 @@ function buildMermaidDefinition(semanticGraph) {
 
     let linkArrow = '-->';
     if (edge.type === 'transition') linkArrow = '==>';
-    else if (edge.type === 'inference' || !isCurrent || edge.type === 'classification' || edge.type === 'reification' || edge.type === 'predicate') linkArrow = '-.->';
+    else if (edge.type === 'inference' || !isCurrent || edge.type === 'classification' || edge.type === 'reification' || edge.type === 'predicate' || edge.type === 'instantiation') linkArrow = '-.->';
 
     let rawLabel = edge.label || '';
     // Show edge properties ONLY in non-RDF views, and in ISO 15926 ONLY on transition edges
@@ -199,6 +202,10 @@ function getMermaidEdgeStyle(edge) {
   const rel = (edge.type || '').toLowerCase();
   const label = (edge.label || '').toLowerCase();
 
+  if (rel === 'meta_rule_red' || label === 'meta_rule_red') return { stroke: '#dc2626', width: 2.5 };
+  if (rel === 'instantiation' || label === 'instantiate') return { stroke: '#94a3b8', width: 1.5, dash: '4 4' };
+  if (rel === 'aggregation' || label === 'aggregation') return { stroke: '#0e7490', width: 2 };
+  if (rel === 'specialization' || rel === 'specialisation' || label === 'specialisation' || label === 'specialization') return { stroke: '#475569', width: 2 };
   if (rel === 'inference') return { stroke: '#8b5cf6', width: 2.5, dash: '5 3' };
   if (rel === 'has_defect' || label === 'has_defect' || label === 'defect') return { stroke: '#ef4444', width: 2.5 };
   if (rel === 'inherence' || label === 'inheres_in') return { stroke: '#f59e0b', width: 2 };
@@ -220,6 +227,9 @@ function getNodeClass(node) {
     case 'InferredHazard': return 'infHazard';
     case 'WisdomDirective': return 'wisdomDir';
     case 'BlindSpot': return 'blindSpot';
+    case 'MetaURMSM': return 'metaURMSM';
+    case 'MetaSMRM': return 'metaSMRM';
+    case 'MetaSMIM': return 'metaSMIM';
     case 'Vehicle': return 'naiveVehicle';
     case 'Slot': return 'naiveSlot';
     case 'Part': return 'naivePart';

@@ -18,6 +18,13 @@ export const state = reactive({
   edgeSequence: 1,
   eventLog: [],
 
+  // --- Meta-Model State Configuration (Nilsson EMEASEC 2026 Slides 14-17) ---
+  metaConfig: {
+    enableFunctionalSlotAspect: true, // Slide 15: Formalising Scope (whether Slot concept is required by Aspect)
+    enableStandardTloAspect: true,    // Slide 15: Standardised Approach (BFO/15926) active vs direct Naive mapping
+    configElementRule: 'PART_AND_SLOT' // Slide 16: 'PART_ONLY' | 'PART_AND_SLOT' | 'SYSTEM_PART_SLOT'
+  },
+
   // --- NEW: Narrative Figures & QDIKW Mode State ---
   figureOverlay: {
     visible: false,
@@ -62,6 +69,9 @@ export function loadState(newState) {
   if (newState.showHistory !== undefined) state.showHistory = newState.showHistory;
   if (newState.currentTime !== undefined) state.currentTime = newState.currentTime;
   if (newState.edgeSequence !== undefined) state.edgeSequence = newState.edgeSequence;
+  if (newState.metaConfig) {
+    Object.assign(state.metaConfig, newState.metaConfig);
+  }
   if (newState.eventLog) {
     state.eventLog.splice(0, state.eventLog.length, ...newState.eventLog);
   }

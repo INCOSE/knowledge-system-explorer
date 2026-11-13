@@ -25,6 +25,7 @@ import { initVisNetwork, updateVisNetwork } from './renderers/vis-adapter.js';
 import { updateMermaidNetwork } from './renderers/mermaid-adapter.js';
 import { generateBomTrees } from './urmsm/bom-view.js';
 import { reduceGraphForSMRM } from './urmsm/smrm-view.js';
+import { generateMetaGraph } from './urmsm/meta-view.js';
 import {
   generateLpgNodeStorage,
   generateLpgStorage,
@@ -165,7 +166,11 @@ const App = {
     }
 
     const semanticGraph = computed(() => {
-      const opts = { ontology: state.ontology, showHistory: state.showHistory };
+      const opts = {
+        ontology: state.ontology,
+        showHistory: state.showHistory,
+        enableSlot: state.metaConfig?.enableFunctionalSlotAspect !== false
+      };
       let rawGraph;
       if (state.ontology === 'BFO') {
         rawGraph = bfoAdapter.generateSemanticGraph(state.eventLog, baseNodes.value, state.currentTime, opts);
@@ -252,6 +257,13 @@ const App = {
       if (state.perspective === 'SMS_LPG') return generatePhysicalGraph(semanticGraph.value, 'LPG');
       if (state.perspective === 'SMS_RDF') return generatePhysicalGraph(semanticGraph.value, 'RDF');
       if (state.perspective === 'SMRM') return smrmReducedGraph.value;
+      if (state.perspective === 'URMSM_META') {
+        return generateMetaGraph(semanticGraph.value, {
+          enableFunctionalSlotAspect: state.metaConfig?.enableFunctionalSlotAspect !== false,
+          configElementRule: state.metaConfig?.configElementRule,
+          ontology: state.ontology
+        });
+      }
       return semanticGraph.value;
     });
 
@@ -264,11 +276,22 @@ const App = {
       if (state.perspective === 'SMRM') viewText = t.value.viewSmrmCaption;
       if (state.perspective === 'SMS_LPG') viewText = t.value.viewPhysicalLpgCaption;
       if (state.perspective === 'SMS_RDF') viewText = t.value.viewPhysicalRdfCaption;
+      if (state.perspective === 'URMSM_META') viewText = t.value.viewMetaCaption;
       return `${ontoText} | ${viewText}`;
     });
 
     const graphLegendItems = computed(() => {
       const nodes = []; const edges = []; const dict = t.value.legend;
+
+      if (state.perspective === 'URMSM_META') {
+        nodes.push({ id: 'metaURMSM', label: dict.metaURMSM, swatch: 'swatch-box-meta-urmsm' });
+        nodes.push({ id: 'metaSMRM', label: dict.metaSMRM, swatch: 'swatch-box-meta-smrm' });
+        nodes.push({ id: 'metaSMIM', label: dict.metaSMIM, swatch: 'swatch-box-meta-smim' });
+        edges.push({ id: 'metaRuleRed', label: dict.metaRuleRed, swatch: 'swatch-line-meta-red' });
+        edges.push({ id: 'metaInstantiate', label: dict.metaInstantiate, swatch: 'swatch-line-instantiate' });
+        edges.push({ id: 'relMount', label: dict.relMountedIn, swatch: 'swatch-line-mount' });
+        return { nodes, edges };
+      }
 
       if (state.perspective === 'SMRM' || state.ontology === 'NAIVE_NODE' || state.ontology === 'NAIVE_EDGE') {
         nodes.push({ id: 'naiveVehicle', label: dict.naiveVehicle, swatch: 'swatch-box-vehicle' });
@@ -1011,6 +1034,7 @@ const App = {
                 <button id="ctrl-view-logical" :class="{ active: state.perspective === 'SMIM' }" @click="setPerspective('SMIM')">{{ t.viewLogical }}</button>
                 <button id="ctrl-view-physical-lpg" :class="{ active: state.perspective === 'SMS_LPG' }" @click="state.storage = 'LPG'; setPerspective('SMS_LPG')">{{ t.viewPhysicalLpg }}</button>
                 <button id="ctrl-view-physical-rdf" :class="{ active: state.perspective === 'SMS_RDF' }" @click="state.storage = 'RDF'; setPerspective('SMS_RDF')">{{ t.viewPhysicalRdf }}</button>
+                <button id="ctrl-view-meta" :class="{ active: state.perspective === 'URMSM_META' }" @click="setPerspective('URMSM_META')">{{ t.viewMeta }}</button>
               </div>
             </div>
             <div class="divider dark-divider"></div>
@@ -1123,6 +1147,26 @@ const App = {
               <option v-for="node in availableNodes" :key="'del_' + node" :value="node">{{ node }}</option>
             </select>
             <button id="biz-del-btn" class="danger" @click="handleBizDeleteNode" title="Sandbox Reset: Delete selected entity">🗑️</button>
+          </div>
+        </div>
+
+        <!-- Meta-Model URMSM Configuration Bar (Nilsson Slides 15-16) -->
+        <div id="meta-model-toolbar" v-if="state.perspective === 'URMSM_META'" class="meta-model-toolbar">
+          <span style="font-weight: 700; color: #0891b2; display: flex; align-items: center; gap: 4px;">
+            <span>🏛️</span> {{ t.metaBarTitle }}
+          </span>
+          <label id="meta-toggle-slot" class="meta-chip" :class="{ active: state.metaConfig.enableFunctionalSlotAspect }">
+            <input type="checkbox" v-model="state.metaConfig.enableFunctionalSlotAspect" @change="renderGraph" style="display:none;">
+            <span>{{ state.metaConfig.enableFunctionalSlotAspect ? '☑' : '☐' }}</span>
+            {{ t.metaAspectSlot }}
+          </label>
+          <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+            <span style="font-weight: 600; color: #0e7490;">{{ t.metaConfigRuleLabel }}:</span>
+            <select id="meta-select-config-rule" class="meta-select" v-model="state.metaConfig.configElementRule" @change="renderGraph">
+              <option value="PART_ONLY">{{ t.metaRulePartOnly }}</option>
+              <option value="PART_AND_SLOT">{{ t.metaRulePartAndSlot }}</option>
+              <option value="SYSTEM_PART_SLOT">{{ t.metaRuleSystemPartSlot }}</option>
+            </select>
           </div>
         </div>
       </div>

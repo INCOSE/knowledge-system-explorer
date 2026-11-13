@@ -121,6 +121,9 @@ function getVisNodeStyle(node) {
     case 'InferredHazard': return { shape: 'hexagon', bg: '#be123c', border: '#881337', textColor: '#ffffff', dashes: [6, 2], borderWidth: 3 };
     case 'WisdomDirective': return { shape: 'box', bg: '#059669', border: '#065f46', textColor: '#ffffff', dashes: false, borderWidth: 3 };
     case 'BlindSpot': return { shape: 'triangle', bg: '#fef08a', border: '#ca8a04', textColor: '#713f12', dashes: [4, 2], borderWidth: 2.5 };
+    case 'MetaURMSM': return { shape: 'box', bg: '#06b6d4', border: '#0e7490', textColor: '#ffffff', borderWidth: 2 };
+    case 'MetaSMRM': return { shape: 'box', bg: '#cbd5e1', border: '#475569', textColor: '#0f172a', borderWidth: 2 };
+    case 'MetaSMIM': return { shape: 'box', bg: '#ffffff', border: '#0f172a', textColor: '#0f172a', borderWidth: 2 };
     case 'Vehicle': return { shape: 'box', bg: '#0284c7', border: '#0369a1', textColor: '#ffffff' };
     case 'Slot': return { shape: 'box', bg: '#64748b', border: '#475569', textColor: '#ffffff', dashes: [4, 3] };
     case 'Part': return { shape: 'box', bg: '#10b981', border: '#059669', textColor: '#ffffff' };
@@ -152,6 +155,10 @@ function getVisEdgeStyle(edge) {
   const rel = (edge.type || '').toLowerCase();
   const label = (edge.label || '').toLowerCase();
 
+  if (rel === 'meta_rule_red' || label === 'meta_rule_red') return { color: '#dc2626', width: 2.5, dashes: false };
+  if (rel === 'instantiation' || label === 'instantiate') return { color: '#94a3b8', width: 1.5, dashes: [4, 4] };
+  if (rel === 'aggregation' || label === 'aggregation') return { color: '#0e7490', width: 2, dashes: false };
+  if (rel === 'specialization' || rel === 'specialisation' || label === 'specialisation' || label === 'specialization') return { color: '#475569', width: 2, dashes: false };
   if (rel === 'inference') return { color: '#8b5cf6', width: 2.5, dashes: [5, 3] };
   if (rel === 'has_defect' || label === 'has_defect' || label === 'defect') return { color: '#ef4444', width: 2.5, dashes: false };
   if (rel === 'inherence' || label === 'inheres_in') return { color: '#f59e0b', width: 2, dashes: false };

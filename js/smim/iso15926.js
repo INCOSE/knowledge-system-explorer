@@ -27,6 +27,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
   const edges = [];
   const stateNodesByOwner = new Map();
   const showHistory = options.showHistory !== undefined ? Boolean(options.showHistory) : true;
+  const enableSlot = options.enableSlot !== undefined ? Boolean(options.enableSlot) : true;
 
   function registerStateNode(ownerId, stateNode) {
     if (!stateNodesByOwner.has(ownerId)) {
@@ -125,6 +126,64 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
             from: childStateId,
             to: parentStateId,
             label: 'stored_at',
+            type: 'composition',
+            childId,
+            parentId,
+            childStateId,
+            parentStateId,
+            properties: { validFrom: timestamp, validTo: null, isCurrent: true }
+          });
+          break;
+        }
+
+        // Robert Nilsson Slide 15: If Functional Object / Slot Aspect is disabled,
+        // link Child State directly to Parent State without intermediate Slot extent/state
+        if (!enableSlot) {
+          const parentStateId = `st_${parentId}_${event.id || `${childId}_${timestamp}`}`;
+          const childStateId = `st_${childId}_${event.id || `${parentId}_${timestamp}`}`;
+
+          const parentState = {
+            id: parentStateId,
+            label: `${parentId}_State`,
+            type: 'State',
+            properties: { ownerId: parentId, validFrom: timestamp, validTo: null, isCurrent: true }
+          };
+          nodeMap.set(parentStateId, parentState);
+          registerStateNode(parentId, parentState);
+
+          const childState = {
+            id: childStateId,
+            label: `${childId}_State`,
+            type: 'State',
+            properties: { ownerId: childId, validFrom: timestamp, validTo: null, isCurrent: true }
+          };
+          nodeMap.set(childStateId, childState);
+          registerStateNode(childId, childState);
+
+          edges.push({
+            id: `tpo_${parentStateId}`,
+            from: parentStateId,
+            to: parentExtentId,
+            label: 'temporalPartOf',
+            type: 'classification',
+            properties: { validFrom: timestamp, validTo: null, isCurrent: true }
+          });
+
+          edges.push({
+            id: `tpo_${childStateId}`,
+            from: childStateId,
+            to: childExtentId,
+            label: 'temporalPartOf',
+            type: 'classification',
+            properties: { validFrom: timestamp, validTo: null, isCurrent: true }
+          });
+
+          const directAssemblyEdgeId = event.id ? `rel_${event.id}` : `rel_${childId}_${parentId}_${timestamp}`;
+          edges.push({
+            id: directAssemblyEdgeId,
+            from: childStateId,
+            to: parentStateId,
+            label: 'mounted_in',
             type: 'composition',
             childId,
             parentId,
@@ -275,6 +334,16 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
               if (tpoParent) {
                 tpoParent.properties.validTo = dismantleTime;
               }
+            }
+          } else if (slotStateId) {
+            // Direct parent state slice without contextual slot
+            const parentState = nodeMap.get(slotStateId);
+            if (parentState) {
+              parentState.properties.validTo = dismantleTime;
+            }
+            const tpoParent = edges.find(e => e.id === `tpo_${slotStateId}`);
+            if (tpoParent) {
+              tpoParent.properties.validTo = dismantleTime;
             }
           }
         }

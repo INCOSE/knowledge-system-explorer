@@ -15,10 +15,18 @@ export const i18n = {
     viewLogical: 'Logical (SMIM)',
     viewPhysicalLpg: 'Physical LPG (SMS)',
     viewPhysicalRdf: 'Physical RDF (SMS)',
+    viewMeta: '🏛️ Meta-Model (URMSM)',
     viewSmrmCaption: 'Engineer Viewpoint (SMRM)',
     viewLogicalCaption: 'Logical Perspective (SMIM)',
     viewPhysicalLpgCaption: 'Physical LPG Storage (SMS)',
     viewPhysicalRdfCaption: 'Physical RDF Triples (SMS)',
+    viewMetaCaption: 'IEC 63339 4-Layer Meta-Model (URMSM / Nilsson EMEASEC 2026)',
+    metaBarTitle: 'IEC 63339 Meta-Model Architecture (Nilsson Slides 14–17)',
+    metaAspectSlot: 'Aspect: Functional Context (Requires Slot Concept — Slide 15)',
+    metaConfigRuleLabel: 'Configuration Rule (Slide 16)',
+    metaRulePartOnly: 'Part Only',
+    metaRulePartAndSlot: 'Part + Slot Allocation',
+    metaRuleSystemPartSlot: 'System + Part + Slot',
     engineTitle: 'ENGINE:',
     saveBtn: '💾 Save JSON',
     loadBtn: '📂 Load JSON',
@@ -90,8 +98,8 @@ export const i18n = {
 
     tooltips: {
       smim: '<strong>SMIM Layer (IEC 63339):</strong> Formal top-level ontological commitment (3D BFO vs 4D ISO 15926).',
-      sms: '<strong>IEC 63339 Perspectives:</strong><br/>• <strong>Engineer (SMRM):</strong> Domain view, abstracts away ontological complexity.<br/>• <strong>Logical (SMIM):</strong> Strict semantic topology (3D continuants or 4D states).<br/>• <strong>Physical (SMS):</strong> Raw database storage (LPG tables or W3C RDF triples).',
-      urmsm: '<strong>URMSM / SMRM Layers (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Viewpoints and business aspects (e.g., this hierarchical BOM tree for manufacturing).<br/>• <strong>SMRM (Reference Model):</strong> Canonical domain concepts (System, Part, Defect) abstracted from IT complexity.'
+      sms: '<strong>IEC 63339 Perspectives:</strong><br/>• <strong>Engineer (SMRM):</strong> Domain view, abstracts away ontological complexity.<br/>• <strong>Logical (SMIM):</strong> Strict semantic topology (3D continuants or 4D states).<br/>• <strong>Physical (SMS):</strong> Raw database storage (LPG tables or W3C RDF triples).<br/>• <strong>Meta-Model (URMSM):</strong> The full architectural stack (Dimensions, Concepts, IT schemas, Data) in a single graph.',
+      urmsm: '<strong>URMSM / SMRM Layers (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Viewpoints and business aspects (e.g., this hierarchical BOM tree for manufacturing).<br/>• <strong>SMRM (Reference Model):</strong> Canonical domain concepts (System, Part, Defect) abstracted from IT complexity.<br/>• <strong>Meta-Model (URMSM):</strong> A unified 4-layer view showing how business aspects drive domain concepts and IT schemas.'
     },
 
     legend: {
@@ -130,7 +138,12 @@ export const i18n = {
       infHazard: 'Inferred Hazard {{Rule 2/3: Failure}}',
       wisdomDir: 'Prescriptive Directive [/Stage W: Wisdom\\]',
       blindSpot: 'Unmapped Condition [/Blind Spot Warning/]',
-      infEdge: 'Inferred Causal Path (SMRM Rule)'
+      infEdge: 'Inferred Causal Path (SMRM Rule)',
+      metaURMSM: 'URMSM Dimension / Aspect (IEC 63339 Layer 1)',
+      metaSMRM: 'SMRM Domain Concept (IEC 63339 Layer 2)',
+      metaSMIM: 'SMIM Information Element (IEC 63339 Layer 3)',
+      metaRuleRed: 'Product Config Element Specialisation (Slide 16)',
+      metaInstantiate: 'Data Instantiation in Tool (Layer 4 SMS)'
     }
   },
 
@@ -143,10 +156,18 @@ export const i18n = {
     viewLogical: 'Логическая (SMIM)',
     viewPhysicalLpg: 'Физическая LPG (SMS)',
     viewPhysicalRdf: 'Физическая RDF (SMS)',
+    viewMeta: '🏛️ Мета-модель (URMSM)',
     viewSmrmCaption: 'Инженерный вид (SMRM)',
     viewLogicalCaption: 'Логическая перспектива (SMIM)',
     viewPhysicalLpgCaption: 'Физическое хранилище LPG (SMS)',
     viewPhysicalRdfCaption: 'Физические триплеты RDF (SMS)',
+    viewMetaCaption: '4-уровневая мета-модель IEC 63339 (URMSM / Nilsson EMEASEC 2026)',
+    metaBarTitle: 'Архитектура мета-модели IEC 63339 (Слайды Нильссона 14–17)',
+    metaAspectSlot: 'Аспект: Функциональный контекст (Требует концепт Слота — Слайд 15)',
+    metaConfigRuleLabel: 'Правило конфигурации (Слайд 16)',
+    metaRulePartOnly: 'Только Деталь (Part)',
+    metaRulePartAndSlot: 'Деталь + Аллокация Слота (Part + Slot)',
+    metaRuleSystemPartSlot: 'Система + Деталь + Слот',
     engineTitle: 'ДВИЖОК:',
     saveBtn: '💾 Сохр. JSON',
     loadBtn: '📂 Загр. JSON',
@@ -218,8 +239,8 @@ export const i18n = {
 
     tooltips: {
       smim: '<strong>Слой SMIM (IEC 63339):</strong> Формальная онтологическая модель (3D-объекты BFO против 4D-состояний ISO 15926).',
-      sms: '<strong>Перспективы IEC 63339:</strong><br/>• <strong>Инженерная (SMRM):</strong> Предметный вид, скрывающий сложность онтологий.<br/>• <strong>Логическая (SMIM):</strong> Строгая семантика (3D-объекты или 4D-состояния).<br/>• <strong>Физическая (SMS):</strong> Структура хранения в БД (таблицы LPG или триплеты W3C RDF).',
-      urmsm: '<strong>Слои URMSM / SMRM (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Точки зрения и бизнес-аспекты (например, данное дерево BOM для отдела производства).<br/>• <strong>SMRM (Reference Model):</strong> Базовые концепты предметной области (Система, Деталь), очищенные от ИТ-сложности БД.'
+      sms: '<strong>Перспективы IEC 63339:</strong><br/>• <strong>Инженерная (SMRM):</strong> Предметный вид, скрывающий сложность онтологий.<br/>• <strong>Логическая (SMIM):</strong> Строгая семантика (3D-объекты или 4D-состояния).<br/>• <strong>Физическая (SMS):</strong> Структура хранения в БД (таблицы LPG или триплеты W3C RDF).<br/>• <strong>Мета-модель (URMSM):</strong> Полный архитектурный стек (Измерения, Концепты, ИТ-схемы, Данные) в одном графе.',
+      urmsm: '<strong>Слои URMSM / SMRM (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Точки зрения и бизнес-аспекты (например, данное дерево BOM для отдела производства).<br/>• <strong>SMRM (Reference Model):</strong> Базовые концепты предметной области (Система, Деталь), очищенные от ИТ-сложности БД.<br/>• <strong>Мета-модель (URMSM):</strong> Единый вид всех 4 слоев, показывающий, как бизнес-аспекты управляют концептами и ИТ-схемами.'
     },
 
     legend: {
@@ -258,7 +279,12 @@ export const i18n = {
       infHazard: 'Выведенная угроза {{Правила 2/3}}',
       wisdomDir: 'Предписание / Директива [/Этап W: Мудрость\\]',
       blindSpot: 'Неизвестное условие [/Слепая зона правил/]',
-      infEdge: 'Выведенная причинно-следственная связь'
+      infEdge: 'Выведенная причинно-следственная связь',
+      metaURMSM: 'Измерение / Аспект URMSM (Слой 1 IEC 63339)',
+      metaSMRM: 'Доменный концепт SMRM (Слой 2 IEC 63339)',
+      metaSMIM: 'Информационный элемент SMIM (Слой 3 IEC 63339)',
+      metaRuleRed: 'Специализация элемента конфигурации (Слайд 16)',
+      metaInstantiate: 'Инстанциация данных в инструменте (Слой 4 SMS)'
     }
   },
 
@@ -271,10 +297,18 @@ export const i18n = {
     viewLogical: 'Logisk (SMIM)',
     viewPhysicalLpg: 'Fysisk LPG (SMS)',
     viewPhysicalRdf: 'Fysisk RDF (SMS)',
+    viewMeta: '🏛️ Metamodell (URMSM)',
     viewSmrmCaption: 'Ingenjörsvy (SMRM)',
     viewLogicalCaption: 'Logiskt perspektiv (SMIM)',
     viewPhysicalLpgCaption: 'Fysisk LPG-lagring (SMS)',
     viewPhysicalRdfCaption: 'Fysiska RDF-tripplar (SMS)',
+    viewMetaCaption: 'IEC 63339 4-skikts metamodell (URMSM / Nilsson EMEASEC 2026)',
+    metaBarTitle: 'IEC 63339 Metamodell-arkitektur (Nilsson Bild 14–17)',
+    metaAspectSlot: 'Aspekt: Funktionell kontext (Kräver Slot-koncept — Bild 15)',
+    metaConfigRuleLabel: 'Konfigurationsregel (Bild 16)',
+    metaRulePartOnly: 'Endast komponent (Part)',
+    metaRulePartAndSlot: 'Komponent + Slot-allokering',
+    metaRuleSystemPartSlot: 'System + Komponent + Slot',
     engineTitle: 'MOTOR:',
     saveBtn: '💾 Spara JSON',
     loadBtn: '📂 Ladda JSON',
@@ -343,8 +377,8 @@ export const i18n = {
 
     tooltips: {
       smim: '<strong>SMIM Lager (IEC 63339):</strong> Formell ontologisk modell (3D BFO vs 4D ISO 15926).',
-      sms: '<strong>IEC 63339 Perspektiv:</strong><br/>• <strong>Ingenjör (SMRM):</strong> Domänvy, döljer ontologisk komplexitet.<br/>• <strong>Logisk (SMIM):</strong> Strikt semantisk topologi (3D-objekt eller 4D-tillstånd).<br/>• <strong>Fysisk (SMS):</strong> Rå databaslagring (LPG-tabeller eller W3C RDF-tripplar).',
-      urmsm: '<strong>URMSM / SMRM Lager (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Vyer och affärsaspekter (t.ex. detta hierarkiska BOM-träd för tillverkning).<br/>• <strong>SMRM (Reference Model):</strong> Kanoniska domänkoncept (System, Komponent) rensade från IT-komplexitet.'
+      sms: '<strong>IEC 63339 Perspektiv:</strong><br/>• <strong>Ingenjör (SMRM):</strong> Domänvy, döljer ontologisk komplexitet.<br/>• <strong>Logisk (SMIM):</strong> Strikt semantisk topologi (3D-objekt eller 4D-tillstånd).<br/>• <strong>Fysisk (SMS):</strong> Rå databaslagring (LPG-tabeller eller W3C RDF-tripplar).<br/>• <strong>Metamodell (URMSM):</strong> Hela arkitekturstacken (Dimensioner, Koncept, IT-scheman, Data) i en enda graf.',
+      urmsm: '<strong>URMSM / SMRM Lager (IEC 63339):</strong><br/>• <strong>URMSM (Unified Reference Model):</strong> Vyer och affärsaspekter (t.ex. detta hierarkiska BOM-träd för tillverkning).<br/>• <strong>SMRM (Reference Model):</strong> Kanoniska domänkoncept (System, Komponent) rensade från IT-komplexitet.<br/>• <strong>Metamodell (URMSM):</strong> En enhetlig 4-skiktsvy som visar hur affärsaspekter styr domänkoncept och IT-scheman.'
     },
 
     legend: {
@@ -382,7 +416,12 @@ export const i18n = {
       infHazard: 'Härledd fara {{Regel 2/3}}',
       wisdomDir: 'Handlingsdirektiv [/Stadie W: Visdom\\]',
       blindSpot: 'Okänt villkor [/Blind fläck/]',
-      infEdge: 'Härledd kausal väg (SMRM-regel)'
+      infEdge: 'Härledd kausal väg (SMRM-regel)',
+      metaURMSM: 'URMSM Dimension / Aspekt (IEC 63339 Skikt 1)',
+      metaSMRM: 'SMRM Domänkoncept (IEC 63339 Skikt 2)',
+      metaSMIM: 'SMIM Informationselement (IEC 63339 Skikt 3)',
+      metaRuleRed: 'Konfigurationselement specialisering (Bild 16)',
+      metaInstantiate: 'Datainstansiering i verktyget (Skikt 4 SMS)'
     }
   }
 };

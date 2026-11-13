@@ -73,7 +73,7 @@ URMSM Viewpoint Generators                                 SMS Physical Storage 
 
 ### Core Orchestration & State
 * `/js/app.js` - **The Orchestrator.** Manages the Vue 3 application instance, reactive view routing, scenario player synchronisation, URL deep-linking, chapter navigation, and cross-layer pipeline orchestration.
-* `/js/state.js` - **Single Source of Truth.** Hosts the reactive application state: `eventLog`, active ontology (`BFO`, `ISO15926`, `NAIVE`), perspective (`SMRM`, `SMIM`, `SMS_LPG`, `SMS_RDF`), storage mode (`LPG`, `RDF`), visual overlays (`figureOverlay`), and Q-D-I-K-W inference options.
+* `/js/state.js` - **Single Source of Truth.** Hosts the reactive application state: `eventLog`, active ontology (`BFO`, `ISO15926`, `NAIVE`), perspective (`SMRM`, `SMIM`, `SMS_LPG`, `SMS_RDF`, `URMSM_META`), meta-model configuration (`metaConfig`: functional slot aspect scope, standardised TLO aspect, and configuration element specialization rules), storage mode (`LPG`, `RDF`), visual overlays (`figureOverlay`), and Q-D-I-K-W inference options.
 * `/js/i18n.js` - Multilingual dictionary (British English `en`, Swedish `sv`, Russian `ru`).
 
 ### The IEC 63339 Pipeline Modules
@@ -92,6 +92,7 @@ URMSM Viewpoint Generators                                 SMS Physical Storage 
 * `/js/urmsm/` (Unified Reference Model for Smart Manufacturing) - **User Viewpoints.**
   * `bom-view.js`: Hierarchical engineering Bill of Materials generator following strict `Parent -> Slot -> Child` traversal.
   * `smrm-view.js`: ISO 42010 Engineer View reduction engine collapsing intermediate contextual `Slot` nodes into direct transitive `has_part` relationships while preserving defect nodes.
+  * `meta-view.js`: 4-Layer IEC 63339 meta-graph generator operationalising Robert Nilsson's EMEASEC 2026 concepts (URMSM Dimensions/Aspects, SMRM Domain Concepts, SMIM Information Elements, and SMS Data in Tool).
   * `query-intents.js`: Live temporal query engine evaluating placement and defect intents over SMRM projections.
 * `/js/scenarios/` - **Interactive Scenarios & Narratives.**
   * `scenario-sandbox-tour.js`: Onboarding scenario introducing UI controls, live domain actions, and multi-perspective exploration.
@@ -120,6 +121,12 @@ The workbench offers four distinct perspectives (`state.perspective`):
 4. **SMS_RDF Perspective (`state.perspective = 'SMS_RDF'`):**
    * Physical W3C Semantic Triples store (`Subject -> Predicate -> Object/Literal`).
    * Edges possess strictly zero properties. Relationship attributes, temporal bounds, and defect metadata are externalised into `rdf:Statement` reification vertices and typed `Literal` nodes.
+5. **URMSM_META Perspective (`state.perspective = 'URMSM_META'`):**
+   * Operationalises Robert Nilsson's EMEASEC 2026 paper (Figures 2, 5, 6 / Slides 14-17) unified 4-layer meta-model inside a single LPG graph.
+   * **Layer 1 (URMSM):** Cyan boxes for Product Development, Manufacturing, and Standardised Approach dimensions and aspects.
+   * **Layer 2 (SMRM):** Grey boxes for canonical domain concepts (System, Part, Slot, Configuration Element). Supports live toggling of the Functional Context Slot aspect (Slide 15) and dynamic Product Configuration Element specialisation rules (Slide 16: Part only, Part + Slot allocation, System + Part + Slot).
+   * **Layer 3 (SMIM):** White boxes with dark borders dynamically reflecting the active top-level ontology (BFO Continuants/Sites/Qualities vs ISO 15926 Extents/States vs Naive property graphs).
+   * **Layer 4 (SMS):** Live data instances from the sandbox linked to SMIM information elements via dashed instantiation edges.
 
 ---
 

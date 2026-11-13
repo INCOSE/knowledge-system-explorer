@@ -25,6 +25,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
   const nodeMap = new Map();
   const edges = [];
   const showHistory = options.showHistory !== undefined ? Boolean(options.showHistory) : true;
+  const enableSlot = options.enableSlot !== undefined ? Boolean(options.enableSlot) : true;
 
   function ensureContinuantNode(partId, overrideClass = null) {
     if (!nodeMap.has(partId)) {
@@ -77,6 +78,27 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
             from: childId,
             to: parentId,
             label: 'stored_at',
+            type: 'composition',
+            childId,
+            parentId,
+            properties: {
+              validFrom: timestamp,
+              validTo: null,
+              isCurrent: true
+            }
+          });
+          break;
+        }
+
+        // Robert Nilsson Slide 15: If Functional Object / Slot Aspect is disabled,
+        // link Child directly to Parent via mounted_in without intermediate Slot node
+        if (!enableSlot) {
+          const mountEdgeId = event.id ? `edge_${event.id}` : `edge_${childId}_${parentId}_${timestamp}`;
+          edges.push({
+            id: mountEdgeId,
+            from: childId,
+            to: parentId,
+            label: 'mounted_in',
             type: 'composition',
             childId,
             parentId,
