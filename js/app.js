@@ -431,6 +431,7 @@ const App = {
         setPerspective('SMIM');
         state.graphEngine = 'MERMAID';
         audioDuration.value = vanishingCrackScenario.fallbackDuration || 148;
+        dispatchVanishingCrackTimeline(0, state, renderGraph);
       }
     }
 
@@ -645,7 +646,6 @@ const App = {
 
       if (resetScenarioGraph) {
         resetActiveScenarioState();
-        nextTick(() => { renderGraph(); });
       }
     }
 
@@ -1239,9 +1239,9 @@ const App = {
         <div class="resizer" id="panel-resizer" @mousedown="startResizeH"></div>
 
         <div class="sidebar" style="flex: 1;">
-          <div class="card" :style="{ flex: '0 0 ' + layout.bomHeight + '%' }">
+          <div class="card" :style="{ flex: '0 0 ' + layout.bomHeight + '%', zIndex: 50 }">
             <h4>
-              <span class="tooltip-trigger align-right">
+              <span class="tooltip-trigger">
                 {{ t.titleBom }}
                 <span class="hover-tooltip" v-html="t.tooltips.urmsm"></span>
               </span>
