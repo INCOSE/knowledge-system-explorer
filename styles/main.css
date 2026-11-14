@@ -1607,3 +1607,21 @@ pre.query-code-block {
   color: #cbd5e1;
   font-size: 10px;
 }
+
+/* --- Live SVG Graph Node Highlighting (Scenario Focus) --- */
+#mermaid-container svg.svg-has-node-focus g.node {
+  opacity: 0.25;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+#mermaid-container svg.svg-has-node-focus g.node.graph-node-highlight {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.95)) drop-shadow(0 0 4px rgba(79, 70, 229, 0.85));
+}
+
+#mermaid-container svg.svg-has-node-focus g.node.graph-node-highlight rect,
+#mermaid-container svg.svg-has-node-focus g.node.graph-node-highlight polygon,
+#mermaid-container svg.svg-has-node-focus g.node.graph-node-highlight path {
+  stroke: #f59e0b !important;
+  stroke-width: 3.5px !important;
+}

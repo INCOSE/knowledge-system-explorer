@@ -59,6 +59,8 @@ export const i18n = {
     menuQdikwSub: 'From Question to Wisdom: Explaining role separation, modular inference & blind spots',
     menuCrackTitle: 'Scenario: The Vanishing Crack',
     menuCrackSub: 'Guided demonstration of temporal defect tracing across lifecycle states',
+    menuMetaTitle: '📐 The 4-Layer Meta-Model (IEC 63339 / URMSM)',
+    menuMetaSub: 'Riding the 4-storey elevator: Dimensions & Aspects, Scope Pruning (Slide 15), Red Config Rules (Slide 16) & Ontology Firewall',
 
     // Action Toolbar Labels
     actRegister: '1. Register:',
@@ -205,6 +207,8 @@ export const i18n = {
     menuQdikwSub: 'От Вопроса к Мудрости: разделение труда экспертов, семантический вывод и слепые зоны',
     menuCrackTitle: 'Сценарий: Исчезающая трещина',
     menuCrackSub: 'Демонстрация прослеживаемости дефектов при смене состояний жизненного цикла',
+    menuMetaTitle: '📐 4-уровневая Мета-модель (IEC 63339 / URMSM)',
+    menuMetaSub: 'Лифт по 4 этажам архитектуры: Измерения и Аспекты, отсечение лишних понятий (Слайд 15) и правила конфигурации (Слайд 16)',
 
     // Панель операций инженера
     actRegister: '1. Регистрация:',
@@ -340,6 +344,8 @@ export const i18n = {
     menuQdikwSub: 'Från Fråga till Visdom: rollfördelning, modulär inferens och blinda fläckar',
     menuCrackTitle: 'Scenario: Den försvinnande sprickan',
     menuCrackSub: 'Guidad demonstration av defektspårning över livscykelstadier',
+    menuMetaTitle: '📐 4-skikts Metamodell (IEC 63339 / URMSM)',
+    menuMetaSub: 'Hissen genom 4 arkitekturvåningar: Dimensioner & Aspekter, Scope-avgränsning (Bild 15) & Konfigurationsregler (Bild 16)',
 
     actRegister: '1. Registrera:',
     actRegisterBtn: 'Registrera',

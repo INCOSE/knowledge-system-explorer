@@ -97,6 +97,7 @@ URMSM Viewpoint Generators                                 SMS Physical Storage 
 * `/js/scenarios/` - **Interactive Scenarios & Narratives.**
   * `scenario-sandbox-tour.js`: Onboarding scenario introducing UI controls, live domain actions, and multi-perspective exploration.
   * `scenario-four-quadrants.js`: Comprehensive 7-chapter narrative exploring the 2×2 matrix (BFO/15926 × LPG/RDF) with slide overlays.
+  * `scenario-meta-architecture.js`: 6-chapter narrative exploring the 4-layer meta-model architecture (IEC 63339 / URMSM), scope pruning, and configuration rules.
   * `scenario-qdikw.js`: Demonstrates the Question-Data-Information-Knowledge-Wisdom pipeline, engineering role perspectives, and blind spot discovery.
   * `scenario-vanishing-crack.js`: Defect tracking lifecycle across temporal paradigms demonstrating the "Vanishing Crack" paradox.
 * `/js/renderers/` - **Visualisation Engines.**

@@ -55,6 +55,11 @@ import {
   onFourQuadrantsTimeUpdate,
   resetFourQuadrantsTimeline
 } from './scenarios/scenario-four-quadrants.js';
+import {
+  metaArchitectureScenario,
+  onMetaArchitectureTimeUpdate,
+  resetMetaArchitectureTimeline
+} from './scenarios/scenario-meta-architecture.js';
 
 const BomNode = {
   name: 'BomNode',
@@ -112,6 +117,7 @@ const App = {
       if (activeScenarioId.value === 'SANDBOX_TOUR') return sandboxTourScenario;
       if (activeScenarioId.value === 'QDIKW_PIPELINE') return qdikwScenario;
       if (activeScenarioId.value === 'FOUR_QUADRANTS') return fourQuadrantsScenario;
+      if (activeScenarioId.value === 'META_ARCHITECTURE') return metaArchitectureScenario;
       return vanishingCrackScenario;
     });
 
@@ -414,6 +420,12 @@ const App = {
         state.graphEngine = 'MERMAID';
         audioDuration.value = fourQuadrantsScenario.fallbackDuration;
         onFourQuadrantsTimeUpdate(0, state, renderGraph, null);
+      } else if (activeScenarioId.value === 'META_ARCHITECTURE') {
+        resetMetaArchitectureTimeline();
+        setPerspective('SMIM');
+        state.graphEngine = 'MERMAID';
+        audioDuration.value = metaArchitectureScenario.fallbackDuration;
+        onMetaArchitectureTimeUpdate(0, state, renderGraph, null);
       } else {
         resetVanishingCrackTimeline(0);
         setPerspective('SMIM');
@@ -544,6 +556,9 @@ const App = {
           FOUR_QUADRANTS: 'FOUR_QUADRANTS',
           MATRIX: 'FOUR_QUADRANTS',
           QUADRANTS: 'FOUR_QUADRANTS',
+          META_ARCHITECTURE: 'META_ARCHITECTURE',
+          META: 'META_ARCHITECTURE',
+          NILSSON: 'META_ARCHITECTURE',
           VANISHING_CRACK: 'VANISHING_CRACK',
           CRACK: 'VANISHING_CRACK'
         };
@@ -625,6 +640,7 @@ const App = {
       if (activeScenarioId.value === 'SANDBOX_TOUR') resetSandboxTourTimeline(0);
       else if (activeScenarioId.value === 'QDIKW_PIPELINE') resetQdikwTimeline(0);
       else if (activeScenarioId.value === 'FOUR_QUADRANTS') resetFourQuadrantsTimeline();
+      else if (activeScenarioId.value === 'META_ARCHITECTURE') resetMetaArchitectureTimeline();
       else resetVanishingCrackTimeline(0);
 
       if (resetScenarioGraph) {
@@ -650,6 +666,8 @@ const App = {
         onQdikwTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else if (activeScenarioId.value === 'FOUR_QUADRANTS') {
         onFourQuadrantsTimeUpdate(currentTime, state, renderGraph, uiRefs);
+      } else if (activeScenarioId.value === 'META_ARCHITECTURE') {
+        onMetaArchitectureTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else {
         dispatchVanishingCrackTimeline(currentTime, state, renderGraph);
       }
@@ -894,6 +912,16 @@ const App = {
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'FOUR_QUADRANTS' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('FOUR_QUADRANTS')">
               <span v-if="copiedLinkKey === 'FOUR_QUADRANTS'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
+
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('META_ARCHITECTURE')">
+              <span class="btn-main-text">{{ t.menuMetaTitle }}</span>
+              <span class="btn-sub-text">{{ t.menuMetaSub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'META_ARCHITECTURE' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('META_ARCHITECTURE')">
+              <span v-if="copiedLinkKey === 'META_ARCHITECTURE'">✓</span><span v-else>🔗</span>
             </button>
           </div>
 
