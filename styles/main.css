@@ -1652,3 +1652,13 @@ pre.query-code-block {
   stroke: #f59e0b !important;
   stroke-width: 3.5px !important;
 }
+
+
+
+/* --- Red Configuration Rule Edges in Mermaid SVG --- */
+#mermaid-container svg path.mermaid-meta-red-edge {
+  stroke: #dc2626 !important;
+  stroke-width: 3.5px !important;
+  filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.55));
+  opacity: 1 !important;
+}

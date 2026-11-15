@@ -11,7 +11,7 @@
 import { INTERNAL_PROPERTY_KEYS } from '../smrm/definitions.js';
 
 let isRendering = false;
-let pendingDefinition = null;
+let pendingRenderTask = null;
 let renderCounter = 0;
 let panZoomInstance = null;
 
@@ -30,13 +30,75 @@ export async function updateMermaidNetwork(semanticGraph, container) {
   const chartDefinition = buildMermaidDefinition(semanticGraph);
 
   if (isRendering) {
-    pendingDefinition = chartDefinition;
+    pendingRenderTask = { definition: chartDefinition, graph: semanticGraph };
     return;
   }
-  await executeRender(chartDefinition, container);
+  await executeRender(chartDefinition, semanticGraph, container);
 }
 
-async function executeRender(definition, container) {
+function applyDirectSvgEdgeStyles(svgElement, semanticGraph) {
+  if (!svgElement || !semanticGraph || !Array.isArray(semanticGraph.edges)) return;
+
+  // Create a dedicated red arrowhead marker in SVG <defs> so red edges have red arrowheads
+  let defs = svgElement.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    svgElement.prepend(defs);
+  }
+  if (!svgElement.querySelector('#meta-red-arrowhead')) {
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', 'meta-red-arrowhead');
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '8');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerUnits', 'strokeWidth');
+    marker.setAttribute('markerWidth', '6');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+    path.setAttribute('fill', '#dc2626');
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  }
+
+  // Query all rendered edge path elements in Mermaid (works for both ELK and Dagre renderers)
+  const edgePaths = Array.from(
+    svgElement.querySelectorAll('path.flowchart-link, g.edgePaths path, g.edges path.path')
+  );
+
+  semanticGraph.edges.forEach((edge, idx) => {
+    const isRedRule = edge.type === 'meta_rule_red' || edge.label === 'meta_rule_red';
+    if (!isRedRule) return;
+
+    const safeFrom = sanitizeId(edge.from);
+    const safeTo = sanitizeId(edge.to);
+
+    // Match path either by ELK/Mermaid ID pattern (L-From-To / L_From_To) or by edge index
+    let targetPath = edgePaths.find(p => {
+      const pid = p.id || '';
+      return (
+        (pid.includes(safeFrom) && pid.includes(safeTo)) ||
+        pid.startsWith(`L-${safeFrom}-${safeTo}`) ||
+        pid.startsWith(`L_${safeFrom}_${safeTo}`)
+      );
+    });
+
+    if (!targetPath && edgePaths[idx]) {
+      targetPath = edgePaths[idx];
+    }
+
+    if (targetPath) {
+      targetPath.classList.add('mermaid-meta-red-edge');
+      targetPath.style.setProperty('stroke', '#dc2626', 'important');
+      targetPath.style.setProperty('stroke-width', '3.5px', 'important');
+      targetPath.style.setProperty('opacity', '1', 'important');
+      targetPath.setAttribute('marker-end', 'url(#meta-red-arrowhead)');
+    }
+  });
+}
+
+async function executeRender(definition, semanticGraph, container) {
   isRendering = true;
   try {
     const renderId = 'mermaid_svg_' + (++renderCounter);
@@ -49,28 +111,32 @@ async function executeRender(definition, container) {
     }
 
     const svgElement = container.querySelector('svg');
-    if (svgElement && window.svgPanZoom) {
-      svgElement.style.width = '100%';
-      svgElement.style.height = '100%';
-      svgElement.style.maxWidth = 'none';
+    if (svgElement) {
+      applyDirectSvgEdgeStyles(svgElement, semanticGraph);
 
-      panZoomInstance = svgPanZoom(svgElement, {
-        zoomEnabled: true,
-        controlIconsEnabled: true,
-        fit: true,
-        center: true,
-        minZoom: 0.1,
-        maxZoom: 10
-      });
+      if (window.svgPanZoom) {
+        svgElement.style.width = '100%';
+        svgElement.style.height = '100%';
+        svgElement.style.maxWidth = 'none';
+
+        panZoomInstance = svgPanZoom(svgElement, {
+          zoomEnabled: true,
+          controlIconsEnabled: true,
+          fit: true,
+          center: true,
+          minZoom: 0.1,
+          maxZoom: 10
+        });
+      }
     }
   } catch (err) {
     console.error('[Mermaid Adapter] Render Error:', err);
   } finally {
     isRendering = false;
-    if (pendingDefinition) {
-      const next = pendingDefinition;
-      pendingDefinition = null;
-      await executeRender(next, container);
+    if (pendingRenderTask) {
+      const next = pendingRenderTask;
+      pendingRenderTask = null;
+      await executeRender(next.definition, next.graph, container);
     }
   }
 }
@@ -171,7 +237,7 @@ function buildMermaidDefinition(semanticGraph) {
     const isCurrent = edge.properties?.isCurrent !== false;
 
     let linkArrow = '-->';
-    if (edge.type === 'transition') linkArrow = '==>';
+    if (edge.type === 'transition' || edge.type === 'meta_rule_red') linkArrow = '==>';
     else if (edge.type === 'inference' || !isCurrent || edge.type === 'classification' || edge.type === 'reification' || edge.type === 'predicate' || edge.type === 'instantiation') linkArrow = '-.->';
 
     let rawLabel = edge.label || '';
