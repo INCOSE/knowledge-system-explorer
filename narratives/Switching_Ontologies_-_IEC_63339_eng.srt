@@ -1,0 +1,749 @@
+1
+00:00:00,140 --> 00:00:03,720
+Welcome to the Ontology Translation and
+Migration Demonstrator.
+
+2
+00:00:05,620 --> 00:00:11,440
+Chapter 1: The Dictionary Illusion - Why
+Ontologies Are Not Vocabulary Lists.
+
+3
+00:00:12,820 --> 00:00:17,200
+Suppose your engineering organization has
+spent three years building a knowledge
+
+4
+00:00:17,200 --> 00:00:22,220
+graph using the Basic Formal Ontology,
+BFO, in three dimensions.
+
+5
+00:00:22,920 --> 00:00:28,040
+Now, you enter a joint venture with a
+heavy industrial consortium or a long-term
+
+6
+00:00:28,040 --> 00:00:33,880
+defense program that mandates ISO 15926
+in four dimensions.
+
+7
+00:00:35,240 --> 00:00:37,900
+Management asks a seemingly innocent
+question.
+
+8
+00:00:38,700 --> 00:00:44,320
+Both databases are mathematically
+rigorous, and both use W3CRDF triples.
+
+9
+00:00:45,000 --> 00:00:51,360
+Can we simply write a script that renames
+BFO classes into ISO 15926 classes?
+
+10
+00:00:53,180 --> 00:00:58,420
+Let us look at the canvas in BFO logical
+mode to see why that assumption is a trap.
+
+11
+00:00:58,420 --> 00:01:05,260
+On the screen, we have tracked a physical
+suspension arm, serial number
+
+12
+00:01:05,260 --> 00:01:11,100
+ARM_SN_404, across its operational
+history.
+
+13
+00:01:11,740 --> 00:01:16,660
+At time T equals 10, the arm was mounted
+into the front suspension slot of
+
+14
+00:01:16,660 --> 00:01:23,543
+vehicle_1. At time T equals 30, an
+inspection recorded a minor defect, 
+
+15
+00:01:23,543 --> 00:01:24,860
+a 2 millimeter crack.
+
+16
+00:01:25,480 --> 00:01:30,900
+At time T equals 50, the arm was
+dismantled from the vehicle, and at time T
+
+17
+00:01:30,900 --> 00:01:35,840
+equals 60, it was placed into warehouse_1
+for warranty analysis.
+
+18
+00:01:37,700 --> 00:01:39,940
+In BFO, look at the topology.
+
+19
+00:01:40,620 --> 00:01:44,440
+How many nodes represent the suspension
+arm across this entire story?
+
+20
+00:01:45,120 --> 00:01:52,460
+Just one, the enduring three-dimensional
+continuant node, ARM_SN_404.
+
+21
+00:01:53,260 --> 00:01:57,540
+It passes through time as a single
+identity, while its relationships carry
+
+22
+00:01:57,540 --> 00:01:59,000
+the historical timestamps.
+
+23
+00:02:01,300 --> 00:02:07,620
+Now, watch what happens if we try to
+translate this database into ISO 15926.
+
+24
+00:02:10,120 --> 00:02:13,160
+Chapter 2: Topological Shock -
+
+25
+00:02:13,220 --> 00:02:16,500
+Splitting One Continuant Into
+Four-Dimensional Worms.
+
+26
+00:02:17,880 --> 00:02:25,720
+Let us switch the ontological lens from
+BFO in 3D to ISO 15926 in 4D.
+
+27
+00:02:28,080 --> 00:02:29,640
+Look closely at the canvas.
+
+28
+00:02:30,260 --> 00:02:35,040
+A one-to-one node mapping did not happen,
+and mathematically could not happen.
+
+29
+00:02:36,700 --> 00:02:41,540
+In a four-dimensional worldview, a
+physical object is not an enduring box
+
+30
+00:02:41,540 --> 00:02:43,360
+that changes its links over time.
+
+31
+00:02:43,980 --> 00:02:46,660
+It is a four-dimensional spacetime worm.
+
+32
+00:02:47,280 --> 00:02:54,220
+The single BFO node ARM_SN_404 has been
+shattered into
+
+33
+00:02:54,220 --> 00:02:55,940
+multiple distinct entities.
+
+34
+00:02:57,780 --> 00:03:01,049
+First, at the top, the translator had to
+create 
+
+35
+00:03:01,049 --> 00:03:07,880
+the whole life individual,
+ARM_SN_404_4D.
+
+36
+00:03:08,700 --> 00:03:14,140
+Notice that this 4D root node has zero
+direct links to the vehicle, the slot, or
+
+37
+00:03:14,140 --> 00:03:14,880
+the warehouse.
+
+38
+00:03:17,180 --> 00:03:22,540
+Second, for every historical episode in
+our database, the translator had to slice
+
+39
+00:03:22,540 --> 00:03:28,140
+a separate immutable temporal part, a
+state node, and wire it back to the 4D
+
+40
+00:03:28,140 --> 00:03:30,140
+parent via temporal part of.
+
+41
+00:03:30,980 --> 00:03:36,620
+One node in BFO became three separate
+nodes in ISO 15926:
+
+42
+00:03:37,240 --> 00:03:43,680
+the timeless 4D worm, the historical state
+slice mounted in the vehicle from T10 to T50,
+
+43
+00:03:44,320 --> 00:03:48,480
+and the active state slice sitting in the
+warehouse from T60 onwards.
+
+44
+00:03:50,320 --> 00:03:55,240
+Even more strikingly, look at vehicle_1
+and its functional slot.
+
+45
+00:03:55,860 --> 00:04:01,300
+Because the suspension arm was removed at
+T50, strict four-dimensional mereology
+
+46
+00:04:01,300 --> 00:04:05,960
+forced the translator to slice temporal
+states for the slot and the vehicle as well.
+
+47
+00:04:07,800 --> 00:04:12,420
+You are not renaming labels. You are
+compiling a three-dimensional graph of
+
+48
+00:04:12,420 --> 00:04:16,339
+things into a four-dimensional geometry of
+spacetime slices.
+
+49
+00:04:18,820 --> 00:04:24,420
+Chapter 3: The Cross-State Quality Dilemma
+- When a Defect Outlives a State.
+
+50
+00:04:26,260 --> 00:04:31,020
+Now let us examine a deeper mathematical
+puzzle that every migration engineer hits.
+
+51
+00:04:31,020 --> 00:04:35,720
+What happens to properties and defects
+when an object changes its state?
+
+52
+00:04:37,640 --> 00:04:41,900
+Let us switch back to BFO for a moment and
+look at the orange quality node,
+
+53
+00:04:42,520 --> 00:04:44,140
+crack 2 millimeters.
+
+54
+00:04:46,320 --> 00:04:51,260
+In BFO, a quality inheres directly in its
+three-dimensional bearer,
+
+55
+00:04:51,260 --> 00:04:58,040
+ARM_SN_404, from T equals 30 right up to
+the present moment.
+
+56
+00:04:58,820 --> 00:05:03,920
+BFO does not care that the arm was removed
+from the vehicle at T50 and put into the
+
+57
+00:05:03,920 --> 00:05:05,380
+warehouse at T60.
+
+58
+00:05:06,140 --> 00:05:09,920
+The crack simply rides along on the single
+enduring part node.
+
+59
+00:05:12,160 --> 00:05:18,240
+Now switch back to ISO 15926 and look at
+where the red defect node is attached.
+
+60
+00:05:20,360 --> 00:05:26,220
+In 4D, a defect cannot hang on the
+timeless 4D worm because the worm was not
+
+61
+00:05:26,220 --> 00:05:28,200
+born cracked at T equals 0.
+
+62
+00:05:28,900 --> 00:05:32,620
+A defect must classify a specific temporal
+state slice.
+
+63
+00:05:34,140 --> 00:05:39,520
+But wait, the crack was discovered at T30
+while the arm was in the vehicle state,
+
+64
+00:05:40,080 --> 00:05:44,380
+and the crack is still there at T60 while
+the arm is in the warehouse state.
+
+65
+00:05:46,260 --> 00:05:53,000
+When writing a translator from BFO to ISO
+15926, the algorithm cannot simply
+
+66
+00:05:53,000 --> 00:05:55,540
+copy the inheres_in edge.
+
+67
+00:05:56,220 --> 00:06:00,840
+It must compare the temporal interval of
+the BFO quality against the temporal
+
+68
+00:06:00,840 --> 00:06:05,820
+boundaries of every 4D state slice and
+decide whether to bind the defect to the
+
+69
+00:06:05,820 --> 00:06:11,135
+historical state- Propagate it across
+subsequent state slices or slice the state
+
+70
+00:06:11,135 --> 00:06:14,916
+yet again at T equals 30 when the crack
+first appeared.
+
+71
+00:06:17,676 --> 00:06:20,616
+Chapter 4: The Underdetermination Trap.
+
+72
+00:06:21,276 --> 00:06:24,096
+What happened between T50 and T60?
+
+73
+00:06:25,496 --> 00:06:28,636
+Let us look even closer at the timestamps
+on our canvas.
+
+74
+00:06:29,376 --> 00:06:31,616
+Notice a subtle gap in our timeline.
+
+75
+00:06:33,696 --> 00:06:42,276
+At time T equals 50, ARM_SN_404 was
+dismantled from vehicle_1.
+
+76
+00:06:42,916 --> 00:06:47,456
+At time T equals 60, it was registered in
+warehouse_1.
+
+77
+00:06:49,476 --> 00:06:53,476
+Where was the physical suspension arm at
+time T equals 55?
+
+78
+00:06:55,436 --> 00:07:01,556
+In a three-dimensional BFO database,
+nobody notices this gap. Between T50 and
+
+79
+00:07:01,556 --> 00:07:08,516
+T60, the node ARM_SN_404 simply sits in
+the database
+
+80
+00:07:08,516 --> 00:07:13,896
+with no active mounting edge. Because a 3D
+continuant exists independently of its
+
+81
+00:07:13,896 --> 00:07:17,316
+location edges, the database remains
+completely valid.
+
+82
+00:07:19,136 --> 00:07:23,896
+Now, imagine you are writing a
+deterministic compiler to convert this BFO
+
+83
+00:07:23,896 --> 00:07:29,576
+database into a strict four-dimensional
+ISO 15926 repository.
+
+84
+00:07:30,456 --> 00:07:34,516
+You immediately hit a philosophical wall
+known as underdetermination.
+
+85
+00:07:36,676 --> 00:07:43,616
+Even though both BFO and ISO 15926 are
+governed by strict logic, the source
+
+86
+00:07:43,616 --> 00:07:49,056
+3D data does not contain enough continuous
+information to uniquely determine the 4D
+
+87
+00:07:49,056 --> 00:07:52,156
+spacetime worm between T50 and T60.
+
+88
+00:07:54,036 --> 00:07:58,816
+Before the math can run, a human architect
+must choose an explicit translation
+
+89
+00:07:58,836 --> 00:08:00,736
+policy, an assumption rule.
+
+90
+00:08:02,976 --> 00:08:05,916
+Policy 1 is the discrete snapshot
+assumption.
+
+91
+00:08:06,656 --> 00:08:11,656
+Under this policy, our translator only
+generates state slices for explicitly
+
+92
+00:08:11,656 --> 00:08:13,016
+recorded relationships.
+
+93
+00:08:13,716 --> 00:08:19,036
+As you can see on the canvas right now,
+the first state slice ends at T50, and the
+
+94
+00:08:19,036 --> 00:08:21,436
+second state slice begins at T60.
+
+95
+00:08:22,156 --> 00:08:26,796
+Between T50 and T60, the 4D worm has a
+temporal gap.
+
+96
+00:08:28,596 --> 00:08:33,316
+Policy 2 is the continuous existence or
+in-transit assumption.
+
+97
+00:08:33,996 --> 00:08:38,896
+In strict physical reality, a 10-kilogram
+piece of steel cannot vanish from
+
+98
+00:08:38,896 --> 00:08:43,296
+spacetime at T50 and materialize out of
+thin air at T60.
+
+99
+00:08:44,016 --> 00:08:50,916
+If your target ISO 15926 system requires
+an unbroken spacetime continuum, the
+
+100
+00:08:50,916 --> 00:08:53,856
+translator must synthesize an intermediate
+state.
+
+101
+00:08:55,676 --> 00:09:00,296
+Watch the canvas as we apply the
+continuous in-transit translation policy
+
+102
+00:09:00,296 --> 00:09:03,116
+for the interval from T50 to T60.
+
+103
+00:09:05,456 --> 00:09:10,616
+The translator automatically bridges the
+10-second vacuum by generating an explicit
+
+104
+00:09:10,616 --> 00:09:14,796
+transit state between the vehicle
+dismantle event and the warehouse arrival.
+
+105
+00:09:14,796 --> 00:09:18,956
+Same source data in BFO.
+
+106
+00:09:19,616 --> 00:09:24,916
+Two completely different, yet
+mathematically valid target graphs in ISO
+
+107
+00:09:24,916 --> 00:09:29,322
+15926. Determinism only works after a
+human architect 
+
+108
+00:09:29,322 --> 00:09:31,716
+locks in the boundary assumptions.
+
+109
+00:09:34,016 --> 00:09:36,636
+Chapter 5: The Storage Paradox.
+
+110
+00:09:37,236 --> 00:09:41,796
+Why R&DF prefers 4D while LPG prefers 3D.
+
+111
+00:09:43,256 --> 00:09:48,656
+Now let us drop down to the physical
+database layer, SMS, to see a surprising
+
+112
+00:09:48,656 --> 00:09:51,616
+twist when migrating actual database
+records.
+
+113
+00:09:53,496 --> 00:09:58,936
+Let us set our ontology to BFO and switch
+the perspective to physical RDF.
+
+114
+00:10:01,136 --> 00:10:03,896
+Look at the canvas and the Turtle code
+under the bonnet.
+
+115
+00:10:04,596 --> 00:10:11,576
+As we saw in the architectural matrix,
+storing 3D BFO history in pure W3CRDF is
+
+116
+00:10:11,576 --> 00:10:15,691
+painful. Because BFO puts timestamps on
+relationships 
+
+117
+00:10:15,691 --> 00:10:18,456
+and RDF predicates cannot hold properties,
+
+118
+00:10:19,096 --> 00:10:24,575
+every single assembly link had to be blown
+up into an artificial yellow hexagon, an
+
+119
+00:10:24,575 --> 00:10:27,356
+RDF colon statement reification node.
+
+120
+00:10:29,656 --> 00:10:35,976
+Now, watch what happens when we translate
+this RDF database from BFO into ISO
+
+121
+00:10:35,976 --> 00:10:39,656
+15926 while staying in physical RDF.
+
+122
+00:10:42,456 --> 00:10:45,776
+Every single yellow reification hexagon
+vanishes.
+
+123
+00:10:47,636 --> 00:10:51,976
+Why did the R&DF graph become cleaner in
+4D than it was in 3D?
+
+124
+00:10:52,796 --> 00:10:59,956
+Because ISO 15926 already reified time at
+the ontological level by creating state nodes.
+
+125
+00:11:00,696 --> 00:11:07,376
+In RDF, attaching valid from and valid to
+as literal ovals directly to a state node
+
+126
+00:11:07,376 --> 00:11:09,656
+requires zero statement reification.
+
+127
+00:11:11,696 --> 00:11:17,556
+Conversely, if we switch the perspective
+to physical LPG, a labeled property graph
+
+128
+00:11:17,556 --> 00:11:20,796
+like Neo4j, the exact opposite happens.
+
+129
+00:11:22,696 --> 00:11:29,616
+In BFO plus LPG, the graph is compact and
+natural because timestamps sit inside the edges.
+
+130
+00:11:30,256 --> 00:11:37,216
+When you migrate to ISO 15926 in LPG, the
+node store table explodes with historical
+
+131
+00:11:37,216 --> 00:11:41,376
+state vertices and artificial
+transition_to pointers.
+
+132
+00:11:43,516 --> 00:11:50,156
+Translating between BFO and ISO 15926 is
+therefore never a neutral schema
+
+133
+00:11:50,156 --> 00:11:53,926
+update. It fundamentally shifts the
+computational burden 
+
+134
+00:11:53,926 --> 00:11:55,876
+between your nodes and your edges.
+
+135
+00:11:58,256 --> 00:12:05,796
+Chapter 6: The IEC 63339 Solution. Don't
+translate graphs, project events.
+
+136
+00:12:07,156 --> 00:12:11,916
+So how should a modern engineering
+organization handle the tension between 3D
+
+137
+00:12:11,916 --> 00:12:17,216
+and 4D ontologies without going bankrupt
+on graph-to-graph migration scripts?
+
+138
+00:12:19,056 --> 00:12:24,196
+Let us switch our perspective to the IEC
+63339 meta-model view.
+
+139
+00:12:26,416 --> 00:12:29,196
+Look at the four architectural floors on
+the canvas.
+
+140
+00:12:29,876 --> 00:12:36,496
+Notice how the gray SMRM domain concepts
+in the middle, system, functional slot,
+
+141
+00:12:36,496 --> 00:12:40,656
+physical part, and configuration element
+remain completely stable.
+
+142
+00:12:42,516 --> 00:12:49,376
+In this workbench, we do not convert a BFO
+graph directly into an ISO 15926
+
+143
+00:12:49,376 --> 00:12:53,296
+graph using brittle SPARQL or Cypher ETL
+pipelines.
+
+144
+00:12:54,976 --> 00:13:00,576
+Instead, we store our engineering history
+as an immutable, ontology-agnostic log of
+
+145
+00:13:00,576 --> 00:13:03,096
+domain events at the SMRM level:
+
+146
+00:13:03,836 --> 00:13:09,376
+register part, assemble into slot, report
+defect, dismantle, and store.
+
+147
+00:13:11,296 --> 00:13:16,416
+Watch the white SMIM layer, the third
+floor of our meta-model, as we toggle
+
+148
+00:13:16,416 --> 00:13:20,356
+between BFO and ISO 15926.
+
+149
+00:13:23,156 --> 00:13:28,436
+Rather than mutating one complex graph
+into another, each ontology acts as a pure
+
+150
+00:13:28,436 --> 00:13:32,176
+functional projection adapter over the
+same canonical event log.
+
+151
+00:13:33,976 --> 00:13:40,136
+When we finally switch to the engineer
+SMRM viewpoint, all that underlying 3D and
+
+152
+00:13:40,136 --> 00:13:45,036
+4D machinery collapses back into a clean,
+unified engineering view.
+
+153
+00:13:47,196 --> 00:13:49,776
+That is the ultimate architectural
+takeaway.
+
+154
+00:13:50,596 --> 00:13:55,516
+Never lock your raw engineering history
+inside the quirks of a single graph topology.
+
+155
+00:13:56,196 --> 00:14:01,616
+Capture domain events cleanly, state your
+temporal assumptions explicitly, and let
+
+156
+00:14:01,616 --> 00:14:04,464
+your upper ontologies serve as
+interchangeable 
+
+157
+00:14:04,464 --> 00:14:06,516
+lenses over a single source of truth.

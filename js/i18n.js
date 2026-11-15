@@ -61,6 +61,8 @@ export const i18n = {
     menuCrackSub: 'Guided demonstration of temporal defect tracing across lifecycle states',
     menuMetaTitle: '📐 The 4-Layer Meta-Model (IEC 63339 / URMSM)',
     menuMetaSub: 'Riding the 4-storey elevator: Dimensions & Aspects, Scope Pruning (Slide 15), Red Config Rules (Slide 16) & Ontology Firewall',
+    menuSwitchOntoTitle: '🔄 Switching Ontologies: BFO (3D) ↔ ISO 15926 (4D) Migration',
+    menuSwitchOntoSub: 'Why graph-to-graph translation hits topological shock, cross-state quality dilemmas & temporal underdetermination',
 
     // Action Toolbar Labels
     actRegister: '1. Register:',
@@ -209,6 +211,8 @@ export const i18n = {
     menuCrackSub: 'Демонстрация прослеживаемости дефектов при смене состояний жизненного цикла',
     menuMetaTitle: '📐 4-уровневая Мета-модель (IEC 63339 / URMSM)',
     menuMetaSub: 'Лифт по 4 этажам архитектуры: Измерения и Аспекты, отсечение лишних понятий (Слайд 15) и правила конфигурации (Слайд 16)',
+    menuSwitchOntoTitle: '🔄 Смена онтологий: Миграция BFO (3D) ↔ ISO 15926 (4D)',
+    menuSwitchOntoSub: 'Топологический шок, сквозные дефекты, ловушка недоопределенности (T50–T60) и проекция событий IEC 63339',
 
     // Панель операций инженера
     actRegister: '1. Регистрация:',
@@ -346,6 +350,8 @@ export const i18n = {
     menuCrackSub: 'Guidad demonstration av defektspårning över livscykelstadier',
     menuMetaTitle: '📐 4-skikts Metamodell (IEC 63339 / URMSM)',
     menuMetaSub: 'Hissen genom 4 arkitekturvåningar: Dimensioner & Aspekter, Scope-avgränsning (Bild 15) & Konfigurationsregler (Bild 16)',
+    menuSwitchOntoTitle: '🔄 Byte av ontologi: BFO (3D) ↔ ISO 15926 (4D) Migration',
+    menuSwitchOntoSub: 'Topologisk chock, tillståndsöverskridande defekter, underbestämdhet (T50–T60) och IEC 63339 händelseprojektion',
 
     actRegister: '1. Registrera:',
     actRegisterBtn: 'Registrera',

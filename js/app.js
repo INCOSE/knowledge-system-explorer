@@ -60,6 +60,11 @@ import {
   onMetaArchitectureTimeUpdate,
   resetMetaArchitectureTimeline
 } from './scenarios/scenario-meta-architecture.js';
+import {
+  switchingOntologiesScenario,
+  onSwitchingOntologiesTimeUpdate,
+  resetSwitchingOntologiesTimeline
+} from './scenarios/scenario-switching-ontologies.js';
 
 const BomNode = {
   name: 'BomNode',
@@ -118,6 +123,7 @@ const App = {
       if (activeScenarioId.value === 'QDIKW_PIPELINE') return qdikwScenario;
       if (activeScenarioId.value === 'FOUR_QUADRANTS') return fourQuadrantsScenario;
       if (activeScenarioId.value === 'META_ARCHITECTURE') return metaArchitectureScenario;
+      if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') return switchingOntologiesScenario;
       return vanishingCrackScenario;
     });
 
@@ -426,6 +432,12 @@ const App = {
         state.graphEngine = 'MERMAID';
         audioDuration.value = metaArchitectureScenario.fallbackDuration;
         onMetaArchitectureTimeUpdate(0, state, renderGraph, null);
+      } else if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') {
+        resetSwitchingOntologiesTimeline();
+        setPerspective('SMIM');
+        state.graphEngine = 'MERMAID';
+        audioDuration.value = switchingOntologiesScenario.fallbackDuration;
+        onSwitchingOntologiesTimeUpdate(0, state, renderGraph, null);
       } else {
         resetVanishingCrackTimeline(0);
         setPerspective('SMIM');
@@ -560,6 +572,9 @@ const App = {
           META_ARCHITECTURE: 'META_ARCHITECTURE',
           META: 'META_ARCHITECTURE',
           NILSSON: 'META_ARCHITECTURE',
+          SWITCHING_ONTOLOGIES: 'SWITCHING_ONTOLOGIES',
+          SWITCHING: 'SWITCHING_ONTOLOGIES',
+          MIGRATION: 'SWITCHING_ONTOLOGIES',
           VANISHING_CRACK: 'VANISHING_CRACK',
           CRACK: 'VANISHING_CRACK'
         };
@@ -642,6 +657,7 @@ const App = {
       else if (activeScenarioId.value === 'QDIKW_PIPELINE') resetQdikwTimeline(0);
       else if (activeScenarioId.value === 'FOUR_QUADRANTS') resetFourQuadrantsTimeline();
       else if (activeScenarioId.value === 'META_ARCHITECTURE') resetMetaArchitectureTimeline();
+      else if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') resetSwitchingOntologiesTimeline();
       else resetVanishingCrackTimeline(0);
 
       if (resetScenarioGraph) {
@@ -668,6 +684,8 @@ const App = {
         onFourQuadrantsTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else if (activeScenarioId.value === 'META_ARCHITECTURE') {
         onMetaArchitectureTimeUpdate(currentTime, state, renderGraph, uiRefs);
+      } else if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') {
+        onSwitchingOntologiesTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else {
         dispatchVanishingCrackTimeline(currentTime, state, renderGraph);
       }
@@ -922,6 +940,16 @@ const App = {
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'META_ARCHITECTURE' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('META_ARCHITECTURE')">
               <span v-if="copiedLinkKey === 'META_ARCHITECTURE'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
+
+          <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('SWITCHING_ONTOLOGIES')">
+              <span class="btn-main-text">{{ t.menuSwitchOntoTitle }}</span>
+              <span class="btn-sub-text">{{ t.menuSwitchOntoSub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'SWITCHING_ONTOLOGIES' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('SWITCHING_ONTOLOGIES')">
+              <span v-if="copiedLinkKey === 'SWITCHING_ONTOLOGIES'">✓</span><span v-else>🔗</span>
             </button>
           </div>
 
