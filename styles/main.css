@@ -400,7 +400,6 @@ button.danger:hover {
   display: flex;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  overflow: hidden;
   background: #ffffff;
   flex-shrink: 0;
 }
@@ -416,8 +415,15 @@ button.danger:hover {
   line-height: 1.2;
 }
 
+.btn-group button:first-child {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+
 .btn-group button:last-child {
   border-right: none;
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
 }
 
 .btn-group button.active {
@@ -833,6 +839,74 @@ pre.query-code-block {
   margin-bottom: 8px;
 }
 
+#query-intent-select {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  max-width: 240px;
+  cursor: pointer;
+  outline: none;
+}
+
+#query-intent-select:focus {
+  border-color: #0284c7;
+}
+
+#query-metrics-bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  border-radius: 5px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+#query-metrics-bar .metric-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+#query-metrics-bar .metric-badge strong {
+  color: #0f172a;
+}
+
+#query-metrics-bar.metric-badge-low {
+  border-left: 3px solid #10b981;
+}
+
+#query-metrics-bar.metric-badge-med {
+  border-left: 3px solid #f59e0b;
+}
+
+#query-metrics-bar.metric-badge-high {
+  border-left: 3px solid #ef4444;
+}
+
+.query-line-mark {
+  background: rgba(251, 191, 36, 0.35);
+  border-left: 3px solid #f59e0b;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
 .query-result-box {
   border: 1px solid #e2e8f0;
   border-radius: 6px;
@@ -957,6 +1031,31 @@ pre.query-code-block {
   font-size: 13.5px;
   font-weight: 700;
   margin-bottom: 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.menu-duration-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  margin-left: 8px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.menu-btn:hover .menu-duration-badge {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
 }
 
 .menu-btn .btn-sub-text {
@@ -1135,17 +1234,33 @@ pre.query-code-block {
 
 /* Подсветка активного элемента во время демонстрационного тура */
 @keyframes tourPulse {
-  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
-  70% { box-shadow: 0 0 0 8px rgba(79, 70, 229, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(56, 189, 248, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+
+@keyframes tourAmberPulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 
 .tour-pulse-highlight {
-  outline: 2px solid #4f46e5 !important;
-  outline-offset: 2px;
-  animation: tourPulse 1.8s infinite;
   position: relative;
   z-index: 30;
+  outline: 2.5px solid #38bdf8 !important;
+  outline-offset: -1px;
+  border-radius: 6px;
+  animation: tourPulse 1.8s infinite;
+}
+
+.tour-amber-highlight {
+  position: relative;
+  z-index: 30;
+  outline: 2.5px solid #f59e0b !important;
+  outline-offset: -1px;
+  border-radius: 6px;
+  animation: tourAmberPulse 1.8s infinite;
 }
 
 /* Настройки для контейнера Mermaid */

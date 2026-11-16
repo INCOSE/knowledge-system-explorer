@@ -19,6 +19,10 @@ export const state = reactive({
   edgeSequence: 1,
   eventLog: [],
 
+  // --- Dynamic Query Intent & Benchmark State ---
+  queryIntent: 'DEEP_BOM', // 'DEEP_BOM' | 'CONTAGION' | 'CLONE_AUDIT'
+  queryHighlight: '', // Substring/token to highlight inside the query code block
+
   // --- Meta-Model State Configuration (Nilsson EMEASEC 2026 Slides 14-17) ---
   metaConfig: {
     enableFunctionalSlotAspect: true, // Slide 15: Formalising Scope (whether Slot concept is required by Aspect)
@@ -70,6 +74,8 @@ export function loadState(newState) {
   if (newState.showHistory !== undefined) state.showHistory = newState.showHistory;
   if (newState.currentTime !== undefined) state.currentTime = newState.currentTime;
   if (newState.edgeSequence !== undefined) state.edgeSequence = newState.edgeSequence;
+  if (newState.queryIntent) state.queryIntent = newState.queryIntent;
+  if (newState.queryHighlight !== undefined) state.queryHighlight = newState.queryHighlight;
   if (newState.metaConfig) {
     Object.assign(state.metaConfig, newState.metaConfig);
   }

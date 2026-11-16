@@ -31,7 +31,11 @@ import {
   generateLpgStorage,
   generateLpgQuery
 } from './sms/lpg-generator.js';
-import { evaluateLiveQuery } from './urmsm/query-intents.js';
+import {
+  evaluateLiveQuery,
+  generateIntentQueryCode,
+  calculateQueryMetrics
+} from './urmsm/query-intents.js';
 import { generateRdfStorage, generateRdfQuery } from './sms/rdf-generator.js';
 import { generatePhysicalGraph } from './sms/sms-graph-generator.js';
 import {
@@ -65,6 +69,12 @@ import {
   onSwitchingOntologiesTimeUpdate,
   resetSwitchingOntologiesTimeline
 } from './scenarios/scenario-switching-ontologies.js';
+import {
+  queryHierarchyScenario,
+  onQueryHierarchyTimeUpdate,
+  resetQueryHierarchyTimeline,
+  clearQueryHierarchyHighlights
+} from './scenarios/scenario-query-hierarchy.js';
 
 const BomNode = {
   name: 'BomNode',
@@ -124,6 +134,7 @@ const App = {
       if (activeScenarioId.value === 'FOUR_QUADRANTS') return fourQuadrantsScenario;
       if (activeScenarioId.value === 'META_ARCHITECTURE') return metaArchitectureScenario;
       if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') return switchingOntologiesScenario;
+      if (activeScenarioId.value === 'QUERY_HIERARCHY') return queryHierarchyScenario;
       return vanishingCrackScenario;
     });
 
@@ -259,12 +270,55 @@ const App = {
       }).join(', ');
     }
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
     const queryCode = computed(() => {
-      if (state.storage === 'LPG') return generateLpgQuery(semanticGraph.value, state.currentTime, state.ontology);
-      return generateRdfQuery(semanticGraph.value, state.currentTime, state.ontology);
+      return generateIntentQueryCode(
+        semanticGraph.value,
+        state.currentTime,
+        state.ontology,
+        state.storage,
+        state.queryIntent
+      );
     });
 
-    const liveQueryResult = computed(() => evaluateLiveQuery(semanticGraph.value, state.currentTime, state.ontology));
+    const highlightedQueryHtml = computed(() => {
+      const code = queryCode.value || '';
+      const escaped = escapeHtml(code);
+      const highlight = (state.queryHighlight || '').trim();
+      if (!highlight) return escaped;
+
+      const escapedHighlight = escapeHtml(highlight);
+      if (!escapedHighlight) return escaped;
+
+      const regexSafe = escapedHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return escaped.replace(new RegExp(regexSafe, 'g'), '<mark class="query-line-mark">$&</mark>');
+    });
+
+    const queryMetrics = computed(() => {
+      return calculateQueryMetrics(
+        semanticGraph.value,
+        state.ontology,
+        state.storage,
+        state.queryIntent
+      );
+    });
+
+    const liveQueryResult = computed(() => {
+      return evaluateLiveQuery(
+        semanticGraph.value,
+        state.currentTime,
+        state.ontology,
+        state.queryIntent,
+        state.eventLog
+      );
+    });
 
     const activeGraph = computed(() => {
       if (state.perspective === 'SMS_LPG') return generatePhysicalGraph(semanticGraph.value, 'LPG');
@@ -409,6 +463,8 @@ const App = {
       state.iso15926Policy = 'DISCRETE';
       state.qdikw.active = false;
       state.figureOverlay.visible = false;
+      state.queryIntent = 'DEEP_BOM';
+      state.queryHighlight = '';
 
       if (activeScenarioId.value === 'SANDBOX_TOUR') {
         resetSandboxTourTimeline(0);
@@ -440,6 +496,12 @@ const App = {
         state.graphEngine = 'MERMAID';
         audioDuration.value = switchingOntologiesScenario.fallbackDuration;
         onSwitchingOntologiesTimeUpdate(0, state, renderGraph, null);
+      } else if (activeScenarioId.value === 'QUERY_HIERARCHY') {
+        resetQueryHierarchyTimeline();
+        setPerspective('SMIM');
+        state.graphEngine = 'MERMAID';
+        audioDuration.value = queryHierarchyScenario.fallbackDuration;
+        onQueryHierarchyTimeUpdate(0, state, renderGraph, null);
       } else {
         resetVanishingCrackTimeline(0);
         setPerspective('SMIM');
@@ -509,6 +571,8 @@ const App = {
       state.currentView = 'MENU';
       state.qdikw.active = false;
       state.figureOverlay.visible = false;
+      state.queryIntent = 'DEEP_BOM';
+      state.queryHighlight = '';
       state.eventLog.splice(0, state.eventLog.length);
       state.currentTime = 0;
       state.edgeSequence = 1;
@@ -577,6 +641,8 @@ const App = {
           SWITCHING_ONTOLOGIES: 'SWITCHING_ONTOLOGIES',
           SWITCHING: 'SWITCHING_ONTOLOGIES',
           MIGRATION: 'SWITCHING_ONTOLOGIES',
+          QUERY_HIERARCHY: 'QUERY_HIERARCHY',
+          QUERIES: 'QUERY_HIERARCHY',
           VANISHING_CRACK: 'VANISHING_CRACK',
           CRACK: 'VANISHING_CRACK'
         };
@@ -660,6 +726,7 @@ const App = {
       else if (activeScenarioId.value === 'FOUR_QUADRANTS') resetFourQuadrantsTimeline();
       else if (activeScenarioId.value === 'META_ARCHITECTURE') resetMetaArchitectureTimeline();
       else if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') resetSwitchingOntologiesTimeline();
+      else if (activeScenarioId.value === 'QUERY_HIERARCHY') resetQueryHierarchyTimeline();
       else resetVanishingCrackTimeline(0);
 
       if (resetScenarioGraph) {
@@ -688,6 +755,8 @@ const App = {
         onMetaArchitectureTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else if (activeScenarioId.value === 'SWITCHING_ONTOLOGIES') {
         onSwitchingOntologiesTimeUpdate(currentTime, state, renderGraph, uiRefs);
+      } else if (activeScenarioId.value === 'QUERY_HIERARCHY') {
+        onQueryHierarchyTimeUpdate(currentTime, state, renderGraph, uiRefs);
       } else {
         dispatchVanishingCrackTimeline(currentTime, state, renderGraph);
       }
@@ -878,7 +947,8 @@ const App = {
       bizDismPart, handleBizDismantle, installedComponents,
       bizDeleteNodeId, handleBizDeleteNode,
       bizStorePart, bizStoreTarget, handleBizStore,
-      bomTrees, lpgNodeRecords, lpgRecords, rdfTtl, formatProperties, queryCode, liveQueryResult,
+      bomTrees, lpgNodeRecords, lpgRecords, rdfTtl, formatProperties,
+      queryCode, highlightedQueryHtml, queryMetrics, liveQueryResult,
       visContainer, mermaidContainer, graphCaption, graphLegendItems, isLegendCollapsed,
       startResizeH, startResizeV, scenarioAudio, isPlaying, audioCurrentTime, audioDuration,
       showSubtitles, currentSubtitleText, playAudio, pauseAudio, togglePlayAudio, stopAudio,
@@ -907,7 +977,7 @@ const App = {
 
           <div class="menu-action-row">
             <button class="menu-btn menu-btn-scenario" @click="launchScenario('SANDBOX_TOUR')">
-              <span class="btn-main-text">{{ t.menuTourTitle }}</span>
+              <span class="btn-main-text">{{ t.menuTourTitle }} <span class="menu-duration-badge">⏱️ 03:06</span></span>
               <span class="btn-sub-text">{{ t.menuTourSub }}</span>
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'SANDBOX_TOUR' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('SANDBOX_TOUR')">
@@ -917,7 +987,7 @@ const App = {
 
           <div class="menu-action-row">
             <button class="menu-btn menu-btn-scenario" @click="launchScenario('QDIKW_PIPELINE')">
-              <span class="btn-main-text">{{ t.menuQdikwTitle }}</span>
+              <span class="btn-main-text">{{ t.menuQdikwTitle }} <span class="menu-duration-badge">⏱️ 08:27</span></span>
               <span class="btn-sub-text">{{ t.menuQdikwSub }}</span>
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'QDIKW_PIPELINE' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('QDIKW_PIPELINE')">
@@ -927,7 +997,7 @@ const App = {
 
           <div class="menu-action-row">
             <button class="menu-btn menu-btn-scenario" @click="launchScenario('FOUR_QUADRANTS')">
-              <span class="btn-main-text">{{ t.menuMatrixTitle || '🏛️ The 2×2 Architectural Matrix (BFO / 15926 × LPG / RDF)' }}</span>
+              <span class="btn-main-text">{{ t.menuMatrixTitle || '🏛️ The 2×2 Architectural Matrix (BFO / 15926 × LPG / RDF)' }} <span class="menu-duration-badge">⏱️ 19:36</span></span>
               <span class="btn-sub-text">{{ t.menuMatrixSub || 'Deep-dive benchmark across all 4 quadrants: supplier federation, reification, 4D state explosion & query cost' }}</span>
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'FOUR_QUADRANTS' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('FOUR_QUADRANTS')">
@@ -937,7 +1007,7 @@ const App = {
 
           <div class="menu-action-row">
             <button class="menu-btn menu-btn-scenario" @click="launchScenario('META_ARCHITECTURE')">
-              <span class="btn-main-text">{{ t.menuMetaTitle }}</span>
+              <span class="btn-main-text">{{ t.menuMetaTitle }} <span class="menu-duration-badge">⏱️ 14:26</span></span>
               <span class="btn-sub-text">{{ t.menuMetaSub }}</span>
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'META_ARCHITECTURE' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('META_ARCHITECTURE')">
@@ -947,7 +1017,7 @@ const App = {
 
           <div class="menu-action-row">
             <button class="menu-btn menu-btn-scenario" @click="launchScenario('SWITCHING_ONTOLOGIES')">
-              <span class="btn-main-text">{{ t.menuSwitchOntoTitle }}</span>
+              <span class="btn-main-text">{{ t.menuSwitchOntoTitle }} <span class="menu-duration-badge">⏱️ 14:07</span></span>
               <span class="btn-sub-text">{{ t.menuSwitchOntoSub }}</span>
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'SWITCHING_ONTOLOGIES' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('SWITCHING_ONTOLOGIES')">
@@ -956,8 +1026,18 @@ const App = {
           </div>
 
           <div class="menu-action-row">
+            <button class="menu-btn menu-btn-scenario" @click="launchScenario('QUERY_HIERARCHY')">
+              <span class="btn-main-text">{{ t.menuQueryTitle }} <span class="menu-duration-badge">⏱️ 10:46</span></span>
+              <span class="btn-sub-text">{{ t.menuQuerySub }}</span>
+            </button>
+            <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'QUERY_HIERARCHY' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('QUERY_HIERARCHY')">
+              <span v-if="copiedLinkKey === 'QUERY_HIERARCHY'">✓</span><span v-else>🔗</span>
+            </button>
+          </div>
+
+          <div class="menu-action-row">
             <button class="menu-btn menu-btn-scenario" @click="launchScenario('VANISHING_CRACK')">
-              <span class="btn-main-text">{{ t.menuCrackTitle }}</span>
+              <span class="btn-main-text">{{ t.menuCrackTitle }} <span class="menu-duration-badge">⏱️ 02:28</span></span>
               <span class="btn-sub-text">{{ t.menuCrackSub }}</span>
             </button>
             <button class="menu-share-btn" :class="{ copied: copiedLinkKey === 'VANISHING_CRACK' }" :title="t.copyLinkTooltip || 'Copy direct link'" @click.stop="copyDemoLink('VANISHING_CRACK')">
@@ -1368,10 +1448,19 @@ const App = {
           <div class="card" style="flex: 1;">
             <h4>
               <span>{{ t.queryTitle }} ({{ state.storage === 'LPG' ? 'Cypher' : 'SPARQL' }})</span>
-              <span style="font-weight: 600; text-transform: none; color: #0d9488;">{{ t.queryDesc }}{{ state.currentTime }})</span>
+              <select id="query-intent-select" v-model="state.queryIntent">
+                <option value="DEEP_BOM">{{ t.intentBom }}</option>
+                <option value="CONTAGION">{{ t.intentContagion }}</option>
+                <option value="CLONE_AUDIT">{{ t.intentClone }}</option>
+              </select>
             </h4>
             <div id="query-content" class="card-scroll-body">
-              <pre class="code-block query-code-block" :style="{ color: state.ontology === 'BFO' ? '#0369a1' : '#3730a3' }">{{ queryCode }}</pre>
+              <div id="query-metrics-bar" :class="queryMetrics.complexityClass">
+                <span class="metric-badge">Depth: <strong>{{ queryMetrics.depth }}</strong> lvl</span>
+                <span class="metric-badge">Joins / Hops: <strong>{{ queryMetrics.joins }}</strong></span>
+                <span class="metric-badge">Temporal Guards: <strong>{{ queryMetrics.guards }}</strong></span>
+              </div>
+              <pre class="code-block query-code-block" :style="{ color: state.ontology === 'BFO' ? '#0369a1' : '#3730a3' }" v-html="highlightedQueryHtml"></pre>
 
               <div class="query-result-box">
                 <div class="query-result-header">

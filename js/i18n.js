@@ -66,6 +66,11 @@ export const i18n = {
     menuMetaSub: 'Riding the 4-storey elevator: Dimensions & Aspects, Scope Pruning (Slide 15), Red Config Rules (Slide 16) & Ontology Firewall',
     menuSwitchOntoTitle: '🔄 Switching Ontologies: BFO (3D) ↔ ISO 15926 (4D) Migration',
     menuSwitchOntoSub: 'Why graph-to-graph translation hits topological shock, cross-state quality dilemmas & temporal underdetermination',
+    menuQueryTitle: '🔍 Query Complexity & Deep Hierarchy Benchmark',
+    menuQuerySub: '4-level nested assemblies, SPARQL reification wall vs 4D transitive paths, contagion trace & bilocation audit',
+    intentBom: '1. Deep As-Built BOM at T',
+    intentContagion: '2. Historical Contagion Trace',
+    intentClone: '3. Physical Integrity (Clone Audit)',
 
     // Action Toolbar Labels
     actRegister: '1. Register:',
@@ -219,6 +224,11 @@ export const i18n = {
     menuMetaSub: 'Лифт по 4 этажам архитектуры: Измерения и Аспекты, отсечение лишних понятий (Слайд 15) и правила конфигурации (Слайд 16)',
     menuSwitchOntoTitle: '🔄 Смена онтологий: Миграция BFO (3D) ↔ ISO 15926 (4D)',
     menuSwitchOntoSub: 'Топологический шок, сквозные дефекты, ловушка недоопределенности (T50–T60) и проекция событий IEC 63339',
+    menuQueryTitle: '🔍 Сложность запросов и глубокие сборки (BOM, Заражение, Клоны)',
+    menuQuerySub: '4 уровня вложенности, распухание реификации в RDF против 4D-транзитивности, трассировка брака и поиск клонов',
+    intentBom: '1. Глубокий BOM на момент T',
+    intentContagion: '2. Трассировка «заражения»',
+    intentClone: '3. Аудит целостности (Клоны)',
 
     // Панель операций инженера
     actRegister: '1. Регистрация:',
@@ -361,6 +371,11 @@ export const i18n = {
     menuMetaSub: 'Hissen genom 4 arkitekturvåningar: Dimensioner & Aspekter, Scope-avgränsning (Bild 15) & Konfigurationsregler (Bild 16)',
     menuSwitchOntoTitle: '🔄 Byte av ontologi: BFO (3D) ↔ ISO 15926 (4D) Migration',
     menuSwitchOntoSub: 'Topologisk chock, tillståndsöverskridande defekter, underbestämdhet (T50–T60) och IEC 63339 händelseprojektion',
+    menuQueryTitle: '🔍 Frågekomplexitet & Djupa Hierarkier (BOM, Smitta, Kloner)',
+    menuQuerySub: '4-nivåers hierarki, SPARQL-reifiering kontra 4D-transitivitet, smittspårning och klonrevision',
+    intentBom: '1. Djup BOM vid tid T',
+    intentContagion: '2. Historisk smittspårning',
+    intentClone: '3. Fysisk integritet (Kloner)',
 
     actRegister: '1. Registrera:',
     actRegisterBtn: 'Registrera',

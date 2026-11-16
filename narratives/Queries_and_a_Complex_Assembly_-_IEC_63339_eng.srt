@@ -1,0 +1,576 @@
+1
+00:00:00,140 --> 00:00:03,860
+Welcome to the Query Complexity and Deep
+Hierarchy Benchmark.
+
+2
+00:00:05,460 --> 00:00:10,220
+Chapter one: The Flat Graph Illusion: Why
+Toy Examples Lie.
+
+3
+00:00:11,620 --> 00:00:16,720
+In our previous architectural matrix, we
+evaluated a simple single-level assembly,
+
+4
+00:00:17,280 --> 00:00:21,160
+one vehicle, one suspension slot, and one
+physical part.
+
+5
+00:00:22,300 --> 00:00:27,640
+When an hierarchy is only one level deep,
+almost any combination of upper ontology
+
+6
+00:00:27,640 --> 00:00:31,940
+and graph database looks deceptively
+manageable in a vendor slide deck.
+
+7
+00:00:33,460 --> 00:00:38,460
+Whether you write Cypher in a labeled
+property graph or SPARQL in an RNDF triple
+
+8
+00:00:38,460 --> 00:00:43,680
+store, checking a single timestamp on a
+direct link takes only three lines of code.
+
+9
+00:00:45,200 --> 00:00:49,100
+However, real industrial systems are never
+one level deep.
+
+10
+00:00:50,460 --> 00:00:55,920
+An aircraft engine, a railway traction
+unit, or an autonomous vehicle is a nested
+
+11
+00:00:55,920 --> 00:01:01,060
+Russian doll of subsystems, modules,
+sub-assemblies, and electronic components.
+
+12
+00:01:01,060 --> 00:01:07,140
+To see what actually happens to your
+database queries at scale, let us look at
+
+13
+00:01:07,140 --> 00:01:11,360
+the database query panel in the bottom
+right corner and build a multi-level
+
+14
+00:01:11,360 --> 00:01:13,260
+assembly live on the canvas.
+
+15
+00:01:15,120 --> 00:01:20,400
+Chapter two: Building a Deep Nested
+Assembly: Watching the Query Swell.
+
+16
+00:01:22,240 --> 00:01:24,720
+Let us start at time T equals 10.
+
+17
+00:01:26,060 --> 00:01:32,620
+We register two top-level operational
+units, unit_alpha and unit_beta,
+
+18
+00:01:32,620 --> 00:01:36,900
+alongside a quarantine facility,
+hub_quarantine.
+
+19
+00:01:38,360 --> 00:01:43,040
+Now, keep your eyes on the database query
+panel at the bottom right as we assemble
+
+20
+00:01:43,040 --> 00:01:44,860
+our hierarchy from the bottom up.
+
+21
+00:01:46,200 --> 00:01:53,140
+First, we install a telemetry microchip,
+sensor_chip_404, into a power
+
+22
+00:01:53,140 --> 00:01:57,560
+electronics sub-assembly, inverter_sub_9.
+
+23
+00:01:59,080 --> 00:02:07,160
+Next, we mount inverter_sub_9 into a heavy
+traction module, powerpack_M1.
+
+24
+00:02:09,060 --> 00:02:15,760
+Finally, we install powerpack_M1 into our
+top-level system, unit_alpha.
+
+25
+00:02:17,380 --> 00:02:21,500
+Look at what just happened to the query
+code in the bottom right panel as our tree
+
+26
+00:02:21,500 --> 00:02:23,420
+reached three levels of depth.
+
+27
+00:02:24,980 --> 00:02:29,980
+Chapter three: Query Intent 1: Deep
+Temporal Bill of Materials.
+
+28
+00:02:31,400 --> 00:02:34,240
+Our first engineering question is
+seemingly basic:
+
+29
+00:02:35,520 --> 00:02:42,180
+Give me the complete multi-level bill of
+materials for unit_alpha at time T equals 20.
+
+30
+00:02:44,340 --> 00:02:48,500
+Let us see how our two-by-two matrix
+handles recursion over time.
+
+31
+00:02:50,320 --> 00:02:56,060
+In a naive graph or a 3D BFO labeled
+property graph, physical parts are
+
+32
+00:02:56,060 --> 00:02:59,160
+enduring nodes and timestamps live on the
+edges.
+
+33
+00:03:00,340 --> 00:03:04,720
+If you lack variable length path
+predicates, every additional level of the
+
+34
+00:03:04,720 --> 00:03:09,760
+engineering tree forces the query
+generator to append another explicit match hop,
+
+35
+00:03:10,420 --> 00:03:16,800
+R1, R2, R3, and another temporal filter
+checking valid from and valid to.
+
+36
+00:03:18,180 --> 00:03:22,260
+Even in modern Cypher, the engine cannot
+simply jump down the tree.
+
+37
+00:03:22,880 --> 00:03:28,340
+It must pause at every single relationship
+along the path and evaluate a temporal inequality.
+
+38
+00:03:30,140 --> 00:03:34,249
+Now, watch what happens when we keep BFO
+in 3D, 
+
+39
+00:03:34,249 --> 00:03:38,700
+but switch the physical database to W3C RDF triples.
+
+40
+00:03:40,760 --> 00:03:44,077
+Look at the SPARQL query in the bottom
+right panel. 
+
+41
+00:03:44,077 --> 00:03:46,840
+It has exploded into a massive wall of text.
+
+42
+00:03:48,620 --> 00:03:52,680
+Why can we not simply use a transitive
+SPARQL property path, like
+
+43
+00:03:52,680 --> 00:03:57,080
+mounted_in_star, to traverse down the
+assembly tree?
+
+44
+00:03:58,420 --> 00:04:03,320
+Because in W3CRDF, binary predicates
+cannot hold timestamps.
+
+45
+00:04:04,780 --> 00:04:11,220
+Every mounting link in 3D BFO had to be
+reified into an artificial RDF statement node.
+
+46
+00:04:12,700 --> 00:04:17,620
+And in standard SPARQL, a recursive
+property path cannot stop mid-flight to
+
+47
+00:04:17,620 --> 00:04:22,640
+inspect the literal valid from and valid
+to timestamps hanging off intermediate
+
+48
+00:04:22,640 --> 00:04:23,900
+reification nodes.
+
+49
+00:04:25,400 --> 00:04:32,180
+To query a four-level tree at time T in
+BFO plus RDF, you are forced to unroll the
+
+50
+00:04:32,180 --> 00:04:37,120
+hierarchy into explicit multi-join blocks
+for every single depth level.
+
+51
+00:04:39,020 --> 00:04:42,204
+Now, keep your eyes on that giant SPARQL
+query 
+
+52
+00:04:42,204 --> 00:04:48,400
+as we switch the ontology 
+from 3D BFO to 4D ISO 15926.
+
+53
+00:04:50,260 --> 00:04:51,040
+Look at that!
+
+54
+00:04:52,120 --> 00:04:59,560
+The massive query instantly collapses into
+a clean three-line transitive expression. Why?
+
+55
+00:05:00,760 --> 00:05:05,700
+Because in a 4D ontology, time is already
+baked into the state slices.
+
+56
+00:05:06,780 --> 00:05:11,340
+The structural links between active states
+are completely free of timestamps.
+
+57
+00:05:12,560 --> 00:05:18,040
+Whether your tree is three levels deep or
+30 levels deep, the query remains identical.
+
+58
+00:05:20,600 --> 00:05:23,160
+Chapter four: Query Intent 2:
+
+59
+00:05:23,780 --> 00:05:26,420
+Field Cannibalization and Contagion
+Tracing.
+
+60
+00:05:27,960 --> 00:05:31,640
+Now, let us make the engineering story
+much more dangerous.
+
+61
+00:05:33,260 --> 00:05:40,240
+At time T equals 30, sensor_chip_404
+develops a critical defect,
+
+62
+00:05:40,680 --> 00:05:45,400
+thermal_drift of 12%, right at the bottom
+of our hierarchy.
+
+63
+00:05:46,960 --> 00:05:53,900
+At time T equals 50, unit_alpha is in the
+depot, and unit_beta needs an
+
+64
+00:05:53,900 --> 00:05:54,880
+urgent deployment.
+
+65
+00:05:56,420 --> 00:06:00,500
+Maintenance technicians perform a field
+cannibalization, a hot swap.
+
+66
+00:06:01,920 --> 00:06:08,860
+They dismantle the entire traction module,
+power pack_M1, from unit_alpha and
+
+67
+00:06:08,860 --> 00:06:11,720
+install it directly into unit_beta.
+
+68
+00:06:13,280 --> 00:06:15,640
+Notice a crucial detail in the database.
+
+69
+00:06:16,360 --> 00:06:20,100
+Nobody touched the inverter or the
+microchip inside the power pack.
+
+70
+00:06:21,280 --> 00:06:24,220
+Their internal mounting timestamps never
+changed.
+
+71
+00:06:24,860 --> 00:06:28,403
+Only the top-level link between power
+pack_M1 
+
+72
+00:06:28,403 --> 00:06:31,340
+and the vehicle changed at T equals 50.
+
+73
+00:06:32,940 --> 00:06:39,600
+Finally, at time T equals 70, the faulty
+sensor_chip_404 is
+
+74
+00:06:39,600 --> 00:06:44,400
+discovered, extracted from the inverter,
+and sent to hub_quarantine.
+
+75
+00:06:46,000 --> 00:06:50,620
+Now, let us select our second business
+question in the query intent dropdown.
+
+76
+00:06:52,120 --> 00:06:57,400
+Historical contagion trace. Find every
+top-level system that operated with this
+
+77
+00:06:57,400 --> 00:07:00,200
+defective microchip while the defect was
+active.
+
+78
+00:07:02,060 --> 00:07:04,000
+Look at the query complexity now.
+
+79
+00:07:05,580 --> 00:07:10,900
+In 3D BFO, the database cannot simply look
+at the microchip's direct parent.
+
+80
+00:07:12,340 --> 00:07:17,980
+The microchip was never mounted directly
+into unit_alpha or unit_beta.
+
+81
+00:07:18,640 --> 00:07:23,280
+It was mounted in inverter_sub_9 the
+entire time.
+
+82
+00:07:24,660 --> 00:07:31,040
+To discover that both unit_alpha and
+unit_beta were exposed to the fault, the
+
+83
+00:07:31,040 --> 00:07:35,260
+query engine must calculate the
+mathematical intersection of four separate
+
+84
+00:07:35,260 --> 00:07:37,020
+time intervals simultaneously.
+
+85
+00:07:38,580 --> 00:07:43,580
+The defect interval, the chip-to-inverter
+interval, the inverter-to-power pack
+
+86
+00:07:43,580 --> 00:07:46,700
+interval, and the power pack-to-vehicle
+intervals.
+
+87
+00:07:48,320 --> 00:07:51,040
+Look at the live query execution result
+table.
+
+88
+00:07:52,400 --> 00:07:59,100
+Both unit_alpha from T30 to T50 and
+unit_beta from
+
+89
+00:07:59,100 --> 00:08:02,740
+T50 to T70 are flagged as contaminated.
+
+90
+00:08:04,420 --> 00:08:08,380
+When we switch to ISO 15926 in 4D,
+
+91
+00:08:09,060 --> 00:08:14,020
+notice why heavy regulated industries love
+this model despite its node explosion.
+
+92
+00:08:15,760 --> 00:08:20,400
+Because every configuration change sliced
+a new immutable state down the tree,
+
+93
+00:08:21,040 --> 00:08:26,680
+tracing historical exposure is a direct
+graph walk across state slices with zero
+
+94
+00:08:26,680 --> 00:08:29,160
+interval overlap math required at query
+time.
+
+95
+00:08:31,020 --> 00:08:36,640
+Chapter five, query intent three: physical
+integrity and the clone paradox.
+
+96
+00:08:38,200 --> 00:08:42,360
+Finally, let us switch the query intent
+dropdown to our third test.
+
+97
+00:08:43,640 --> 00:08:48,320
+Physical integrity audit: detecting
+bilocation and cloned parts.
+
+98
+00:08:49,880 --> 00:08:55,400
+Suppose at time T equals 75, an automated
+supplier script registers
+
+99
+00:08:55,400 --> 00:09:01,200
+sensor_chip_404 as installed in unit_beta,
+
+100
+00:09:01,820 --> 00:09:07,640
+but due to a software bug, fails to close
+its storage record in hub_quarantine.
+
+101
+00:09:09,260 --> 00:09:14,820
+In a schema-free naive LPG or an
+unconstrained property graph, the database
+
+102
+00:09:14,820 --> 00:09:16,600
+happily accepts the transaction.
+
+103
+00:09:17,760 --> 00:09:22,500
+A single physical microchip with one
+serial number is now simultaneously
+
+104
+00:09:22,500 --> 00:09:25,181
+sitting on a shelf in the quarantine
+warehouse 
+
+105
+00:09:25,181 --> 00:09:27,520
+and flying inside an operational vehicle.
+
+106
+00:09:28,920 --> 00:09:34,180
+To catch this in LPG, you must manually
+write and schedule defensive audit queries
+
+107
+00:09:34,180 --> 00:09:37,680
+counting distinct active parent chains
+per serial number.
+
+108
+00:09:39,240 --> 00:09:45,560
+When we switch to our formal ontological
+views with W3C SHACL and SMRM semantic
+
+109
+00:09:45,560 --> 00:09:50,380
+rules enabled, the architecture
+immediately triggers a boundary violation alert.
+
+110
+00:09:51,980 --> 00:09:57,860
+A single 3D material entity or a single 4D
+state slice at time T
+
+111
+00:09:58,500 --> 00:10:02,200
+cannot occupy two disjoint spatial sites
+simultaneously.
+
+112
+00:10:04,140 --> 00:10:08,300
+Let us return to the engineer SMRM
+viewpoint to conclude.
+
+113
+00:10:10,100 --> 00:10:14,660
+By combining deep assemblies with live
+query intents, the trade-offs of our
+
+114
+00:10:14,660 --> 00:10:17,060
+two-by-two matrix become crystal clear.
+
+115
+00:10:18,680 --> 00:10:23,680
+3D LPG gives you effortless developer
+onboarding and fast shallow queries.
+
+116
+00:10:25,080 --> 00:10:28,023
+3D RDF gives you global URI governance,
+
+
+117
+00:10:28,023 --> 00:10:32,300
+but punishes deep temporal 
+recursion with reification joins.
+
+118
+00:10:33,720 --> 00:10:40,640
+While 4D ISO 15926 pays a heavy upfront
+price in state nodes so
+
+119
+00:10:40,640 --> 00:10:44,920
+that deep historical audits and
+multi-level configuration queries remain
+
+120
+00:10:44,920 --> 00:10:46,380
+mathematically effortless.

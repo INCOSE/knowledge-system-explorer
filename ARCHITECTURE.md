@@ -98,6 +98,8 @@ URMSM Viewpoint Generators                                 SMS Physical Storage 
   * `scenario-sandbox-tour.js`: Onboarding scenario introducing UI controls, live domain actions, and multi-perspective exploration.
   * `scenario-four-quadrants.js`: Comprehensive 7-chapter narrative exploring the 2×2 matrix (BFO/15926 × LPG/RDF) with slide overlays.
   * `scenario-meta-architecture.js`: 6-chapter narrative exploring the 4-layer meta-model architecture (IEC 63339 / URMSM), scope pruning, and configuration rules.
+  * `scenario-switching-ontologies.js`: Guided walkthrough of ontology migration (BFO 3D ↔ ISO 15926 4D), topological shock, and temporal underdetermination.
+  * `scenario-query-hierarchy.js`: 5-chapter benchmark exploring query complexity, deep 4-level assemblies, SPARQL reification wall vs 4D transitive property paths, contagion trace, and clone paradox audits.
   * `scenario-qdikw.js`: Demonstrates the Question-Data-Information-Knowledge-Wisdom pipeline, engineering role perspectives, and blind spot discovery.
   * `scenario-vanishing-crack.js`: Defect tracking lifecycle across temporal paradigms demonstrating the "Vanishing Crack" paradox.
 * `/js/renderers/` - **Visualisation Engines.**
