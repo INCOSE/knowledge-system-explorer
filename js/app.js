@@ -180,6 +180,7 @@ const App = {
     const semanticGraph = computed(() => {
       const opts = {
         ontology: state.ontology,
+        iso15926Policy: state.iso15926Policy || 'DISCRETE',
         showHistory: state.showHistory,
         enableSlot: state.metaConfig?.enableFunctionalSlotAspect !== false
       };
@@ -405,6 +406,7 @@ const App = {
       state.eventLog.splice(0, state.eventLog.length);
       state.currentTime = 0;
       state.ontology = 'NAIVE_NODE';
+      state.iso15926Policy = 'DISCRETE';
       state.qdikw.active = false;
       state.figureOverlay.visible = false;
 
@@ -1072,6 +1074,17 @@ const App = {
                 <button id="ctrl-onto-iso" :class="{ active: state.ontology === 'ISO15926' }" @click="state.ontology = 'ISO15926'">ISO 15926 (4D)</button>
                 <button id="ctrl-onto-naive-node" :class="{ active: state.ontology === 'NAIVE_NODE' }" @click="state.ontology = 'NAIVE_NODE'">{{ t.ontoNaiveNode }}</button>
                 <button id="ctrl-onto-naive-edge" :class="{ active: state.ontology === 'NAIVE_EDGE' }" @click="state.ontology = 'NAIVE_EDGE'">{{ t.ontoNaiveEdge }}</button>
+              </div>
+            </div>
+
+            <!-- Contextual 4D Gap Interpolation Policy Toggle (Visible when ISO 15926 is active) -->
+            <div v-if="state.ontology === 'ISO15926'" class="lens-control-group" style="margin-left: 4px;">
+              <div class="section-label lens-label" style="color: #38bdf8;">
+                <span>⏱️ {{ t.isoPolicyLabel }}</span>
+              </div>
+              <div id="ctrl-iso-policy-group" class="btn-group lens-btn-group">
+                <button id="ctrl-policy-discrete" :class="{ active: state.iso15926Policy === 'DISCRETE' }" @click="state.iso15926Policy = 'DISCRETE'" title="Policy 1: Discrete Snapshot Assumption (leaves temporal gaps between dismantle and storage)">{{ t.isoPolicyDiscrete }}</button>
+                <button id="ctrl-policy-transit" :class="{ active: state.iso15926Policy === 'TRANSIT' }" @click="state.iso15926Policy = 'TRANSIT'" title="Policy 2: Continuous In-Transit Assumption (synthesizes intermediate 4D transit state slices)">{{ t.isoPolicyTransit }}</button>
               </div>
             </div>
             <div class="divider dark-divider"></div>

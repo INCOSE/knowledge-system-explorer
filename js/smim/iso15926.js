@@ -26,8 +26,87 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
   const nodeMap = new Map();
   const edges = [];
   const stateNodesByOwner = new Map();
+  const lastDismantleByPart = new Map();
   const showHistory = options.showHistory !== undefined ? Boolean(options.showHistory) : true;
   const enableSlot = options.enableSlot !== undefined ? Boolean(options.enableSlot) : true;
+  const isoPolicy = options.iso15926Policy || 'DISCRETE';
+
+  function synthesizeTransitSliceIfNeeded(partId, nextTimestamp) {
+    if (isoPolicy !== 'TRANSIT') return;
+    const lastDismantleTime = lastDismantleByPart.get(partId);
+    if (lastDismantleTime === undefined || lastDismantleTime === null) return;
+    if (nextTimestamp <= lastDismantleTime) {
+      lastDismantleByPart.delete(partId);
+      return;
+    }
+
+    const partExtentId = ensureExtentNode(partId);
+    const transitExtentId = ensureExtentNode('Transit_Corridor', 'Warehouse');
+
+    const partTransitStateId = `st_${partId}_transit_${lastDismantleTime}_${nextTimestamp}`;
+    const hubTransitStateId = `st_Transit_Corridor_${partId}_${lastDismantleTime}_${nextTimestamp}`;
+
+    const partTransitState = {
+      id: partTransitStateId,
+      label: `${partId}_Transit_State`,
+      type: 'State',
+      properties: {
+        ownerId: partId,
+        validFrom: lastDismantleTime,
+        validTo: nextTimestamp,
+        isCurrent: false
+      }
+    };
+    nodeMap.set(partTransitStateId, partTransitState);
+    registerStateNode(partId, partTransitState);
+
+    const hubTransitState = {
+      id: hubTransitStateId,
+      label: `Transit_Corridor_State`,
+      type: 'State',
+      properties: {
+        ownerId: 'Transit_Corridor',
+        validFrom: lastDismantleTime,
+        validTo: nextTimestamp,
+        isCurrent: false
+      }
+    };
+    nodeMap.set(hubTransitStateId, hubTransitState);
+    registerStateNode('Transit_Corridor', hubTransitState);
+
+    edges.push(
+      {
+        id: `tpo_${partTransitStateId}`,
+        from: partTransitStateId,
+        to: partExtentId,
+        label: 'temporalPartOf',
+        type: 'classification',
+        properties: { validFrom: lastDismantleTime, validTo: nextTimestamp, isCurrent: false }
+      },
+      {
+        id: `tpo_${hubTransitStateId}`,
+        from: hubTransitStateId,
+        to: transitExtentId,
+        label: 'temporalPartOf',
+        type: 'classification',
+        properties: { validFrom: lastDismantleTime, validTo: nextTimestamp, isCurrent: false }
+      },
+      {
+        id: `rel_transit_${partId}_${lastDismantleTime}_${nextTimestamp}`,
+        from: partTransitStateId,
+        to: hubTransitStateId,
+        label: 'in_transit_at',
+        type: 'composition',
+        childId: partId,
+        parentId: 'Transit_Corridor',
+        childStateId: partTransitStateId,
+        parentStateId: hubTransitStateId,
+        properties: { validFrom: lastDismantleTime, validTo: nextTimestamp, isCurrent: false }
+      }
+    );
+
+    lastDismantleByPart.delete(partId);
+  }
 
   function registerStateNode(ownerId, stateNode) {
     if (!stateNodesByOwner.has(ownerId)) {
@@ -76,6 +155,8 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         const { parentId, childId } = event;
         const relType = event.relationType || 'mounted_in';
         const timestamp = event.valid_from;
+
+        synthesizeTransitSliceIfNeeded(childId, timestamp);
 
         const parentExtentId = ensureExtentNode(parentId);
         const childExtentId = ensureExtentNode(childId);
@@ -291,6 +372,7 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
       case 'DISMANTLE': {
         const { childId } = event;
         const dismantleTime = event.valid_from;
+        lastDismantleByPart.set(childId, dismantleTime);
 
         const activeAssembly = edges.find(
           e => (e.childId === childId || e.from.startsWith(`st_${childId}_`)) &&
@@ -477,6 +559,67 @@ export function generateSemanticGraph(eventLog = [], baseNodes = [], currentTime
         break;
     }
   });
+
+  // 3b. If a dismantled part has not yet been re-assembled by currentTime, synthesize an open transit slice up to currentTime when in TRANSIT mode
+  if (isoPolicy === 'TRANSIT' && currentTime !== null && currentTime !== undefined) {
+    for (const [partId, dismantleTime] of lastDismantleByPart.entries()) {
+      if (currentTime > dismantleTime) {
+        const partExtentId = ensureExtentNode(partId);
+        const transitExtentId = ensureExtentNode('Transit_Corridor', 'Warehouse');
+        const partTransitStateId = `st_${partId}_transit_${dismantleTime}_open`;
+        const hubTransitStateId = `st_Transit_Corridor_${partId}_${dismantleTime}_open`;
+
+        const partTransitState = {
+          id: partTransitStateId,
+          label: `${partId}_Transit_State`,
+          type: 'State',
+          properties: { ownerId: partId, validFrom: dismantleTime, validTo: null, isCurrent: true }
+        };
+        nodeMap.set(partTransitStateId, partTransitState);
+        registerStateNode(partId, partTransitState);
+
+        const hubTransitState = {
+          id: hubTransitStateId,
+          label: `Transit_Corridor_State`,
+          type: 'State',
+          properties: { ownerId: 'Transit_Corridor', validFrom: dismantleTime, validTo: null, isCurrent: true }
+        };
+        nodeMap.set(hubTransitStateId, hubTransitState);
+        registerStateNode('Transit_Corridor', hubTransitState);
+
+        edges.push(
+          {
+            id: `tpo_${partTransitStateId}`,
+            from: partTransitStateId,
+            to: partExtentId,
+            label: 'temporalPartOf',
+            type: 'classification',
+            properties: { validFrom: dismantleTime, validTo: null, isCurrent: true }
+          },
+          {
+            id: `tpo_${hubTransitStateId}`,
+            from: hubTransitStateId,
+            to: transitExtentId,
+            label: 'temporalPartOf',
+            type: 'classification',
+            properties: { validFrom: dismantleTime, validTo: null, isCurrent: true }
+          },
+          {
+            id: `rel_transit_${partId}_${dismantleTime}_open`,
+            from: partTransitStateId,
+            to: hubTransitStateId,
+            label: 'in_transit_at',
+            type: 'composition',
+            childId: partId,
+            parentId: 'Transit_Corridor',
+            childStateId: partTransitStateId,
+            parentStateId: hubTransitStateId,
+            properties: { validFrom: dismantleTime, validTo: null, isCurrent: true }
+          }
+        );
+      }
+    }
+  }
 
   // 4. Synchronise final temporal currentness flags across States, Defects, and Edges
   const isTimeActive = (validTo) =>

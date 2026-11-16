@@ -9,6 +9,7 @@ export const state = reactive({
   currentView: 'MENU',
   userRole: 'UNI_ENGINEER',
   ontology: 'BFO',
+  iso15926Policy: 'DISCRETE', // 'DISCRETE' (Snapshot) | 'TRANSIT' (Continuous Space-Time Extent)
   perspective: 'SMRM',
   storage: 'LPG',
   graphEngine: 'VIS',

@@ -65,26 +65,8 @@ function seedDiscreteHistory(state) {
   state.currentTime = 60;
 }
 
-/**
- * Seeds the Continuous In-Transit event log (bridging T50 -> T60 with an explicit transit state).
- */
-function seedContinuousTransitHistory(state) {
-  state.eventLog.splice(0, state.eventLog.length);
-  state.edgeSequence = 1;
-  state.eventLog.push(
-    createRegisterPartEvent('Vehicle_1', 0, 'Vehicle', 'veh1'),
-    createRegisterPartEvent('Warehouse_1', 0, 'Warehouse', 'wh1'),
-    createRegisterPartEvent('Transit_Corridor', 0, 'Warehouse', 'transit_hub'),
-    createRegisterPartEvent('ARM_SN_404', 10, 'Part', 'arm404'),
-    createAssembleEvent('Vehicle_1', 'ARM_SN_404', 'mounted_in', 10, 'asm_veh_10'),
-    createReportDefectEvent('ARM_SN_404', 'crack', '2mm', 30, 'def_crack_30'),
-    createDismantleEvent('ARM_SN_404', 50, 'dism_veh_50'),
-    createAssembleEvent('Transit_Corridor', 'ARM_SN_404', 'stored_at', 50, 'transit_50'),
-    createDismantleEvent('ARM_SN_404', 60, 'dism_transit_60'),
-    createAssembleEvent('Warehouse_1', 'ARM_SN_404', 'stored_at', 60, 'store_wh_60')
-  );
-  state.currentTime = 60;
-}
+// Note: Continuous In-Transit state synthesis is now handled natively by `js/smim/iso15926.js`
+// via `state.iso15926Policy = 'TRANSIT'` over the exact same immutable `state.eventLog`!
 
 export const switchingOntologiesScenario = {
   id: 'SWITCHING_ONTOLOGIES',
@@ -514,9 +496,10 @@ export const switchingOntologiesScenario = {
       // "Policy 1 is the Discrete Snapshot Assumption... the first state slice ends at T50, and the second begins at T60."
       time: 482.98,
       action: (state, renderGraph) => {
-        seedDiscreteHistory(state);
         state.ontology = 'ISO15926';
+        state.iso15926Policy = 'DISCRETE';
         setPerspective('SMIM');
+        highlightElements('#ctrl-policy-discrete', 'tour-amber-highlight');
         renderGraph();
         highlightGraphNodes([
           'st_ARM_SN_404_evt_asm_ARM_SN_404_10_asm_veh_10',
@@ -525,18 +508,25 @@ export const switchingOntologiesScenario = {
       }
     },
     {
+      // "Policy 2 is the Continuous Existence, or In-Transit, Assumption..."
+      time: 508.60,
+      action: () => {
+        highlightElements('#ctrl-policy-transit', 'tour-amber-highlight');
+      }
+    },
+    {
       // "Watch the canvas as we apply the Continuous In-Transit translation policy for the interval from T50 to T60."
       time: 535.68,
       action: (state, renderGraph) => {
-        seedContinuousTransitHistory(state);
         state.ontology = 'ISO15926';
+        state.iso15926Policy = 'TRANSIT';
         setPerspective('SMIM');
-        highlightElements('#canvas-container', 'tour-amber-highlight');
+        highlightElements(['#ctrl-policy-transit', '#canvas-container'], 'tour-amber-highlight');
         renderGraph();
         highlightGraphNodes([
           '4d_Transit_Corridor',
-          'st_Transit_Corridor_evt_asm_ARM_SN_404_50_transit_50',
-          'st_ARM_SN_404_evt_asm_ARM_SN_404_50_transit_50'
+          'st_Transit_Corridor_ARM_SN_404_50_60',
+          'st_ARM_SN_404_transit_50_60'
         ]);
       }
     },
@@ -546,7 +536,7 @@ export const switchingOntologiesScenario = {
       action: () => {
         highlightGraphNodes([
           'st_ARM_SN_404_evt_asm_ARM_SN_404_10_asm_veh_10',
-          'st_ARM_SN_404_evt_asm_ARM_SN_404_50_transit_50',
+          'st_ARM_SN_404_transit_50_60',
           'st_ARM_SN_404_evt_asm_ARM_SN_404_60_store_wh_60'
         ]);
       }
@@ -560,6 +550,7 @@ export const switchingOntologiesScenario = {
       time: 593.50,
       action: (state, renderGraph) => {
         seedDiscreteHistory(state);
+        state.iso15926Policy = 'DISCRETE';
         state.ontology = 'BFO';
         state.storage = 'RDF';
         setPerspective('SMS_RDF');

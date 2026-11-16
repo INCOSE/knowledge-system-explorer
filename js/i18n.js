@@ -8,6 +8,9 @@
 export const i18n = {
   en: {
     ontoTitle: 'ONTOLOGY:',
+    isoPolicyLabel: '4D GAP POLICY:',
+    isoPolicyDiscrete: 'P1: Discrete',
+    isoPolicyTransit: 'P2: In-Transit',
     ontoNaiveNode: 'Naive Graph (Node)',
     ontoNaiveEdge: 'Naive Graph (Edge)',
     viewTitle: 'PERSPECTIVE:',
@@ -153,6 +156,9 @@ export const i18n = {
 
   ru: {
     ontoTitle: 'ОНТОЛОГИЯ:',
+    isoPolicyLabel: '4D ПОЛИТИКА:',
+    isoPolicyDiscrete: 'P1: Дискретная',
+    isoPolicyTransit: 'P2: Транзит',
     ontoNaiveNode: 'Наивный граф (Узел)',
     ontoNaiveEdge: 'Наивный граф (Ребро)',
     viewTitle: 'ПЕРСПЕКТИВА:',
@@ -298,6 +304,9 @@ export const i18n = {
 
   sv: {
     ontoTitle: 'ONTOLOGI:',
+    isoPolicyLabel: '4D GAP-POLICY:',
+    isoPolicyDiscrete: 'P1: Diskret',
+    isoPolicyTransit: 'P2: I Transit',
     ontoNaiveNode: 'Naiv Graf (Nod)',
     ontoNaiveEdge: 'Naiv Graf (Kant)',
     viewTitle: 'PERSPEKTIV:',
